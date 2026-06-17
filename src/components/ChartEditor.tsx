@@ -160,36 +160,46 @@ export function ChartEditor() {
         </div>
 
         <div className="toolbar">
-          <label className="field compact">
-            <span>Title</span>
-            <input value={project.title} onChange={(event) => updateTitle(event.target.value)} />
-          </label>
+          <div className="command-group document-fields">
+            <label className="field compact">
+              <span>Title</span>
+              <input value={project.title} onChange={(event) => updateTitle(event.target.value)} />
+            </label>
 
-          <label className="field compact">
-            <span>Theme</span>
-            <select value={project.theme.id} onChange={(event) => updateTheme(event.target.value)}>
-              {themes.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="field compact">
+              <span>Theme</span>
+              <select value={project.theme.id} onChange={(event) => updateTheme(event.target.value)}>
+                {themes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-          <button className="icon-button" type="button" onClick={resetVisualEdits} title="Reset visual edits">
-            <Palette size={18} />
-          </button>
-          <button className="icon-button" type="button" onClick={resetData} title="Reset chart">
-            <RefreshCcw size={18} />
-          </button>
-          <button className="action-button ghost" type="button" onClick={exportSvg} disabled={!validation.valid}>
-            <Download size={17} />
-            SVG
-          </button>
-          <button className="action-button" type="button" onClick={exportPng} disabled={!validation.valid}>
-            <FileImage size={17} />
-            PNG
-          </button>
+          <div className="command-group">
+            <span className={validation.valid ? "status-chip ready" : "status-chip warning"}>
+              {validation.valid ? "Ready" : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"}`}
+            </span>
+            <button className="icon-button" type="button" onClick={resetVisualEdits} title="Reset visual edits">
+              <Palette size={18} />
+            </button>
+            <button className="icon-button" type="button" onClick={resetData} title="Reset chart">
+              <RefreshCcw size={18} />
+            </button>
+          </div>
+
+          <div className="command-group export-group">
+            <button className="action-button ghost" type="button" onClick={exportSvg} disabled={!validation.valid}>
+              <Download size={17} />
+              SVG
+            </button>
+            <button className="action-button" type="button" onClick={exportPng} disabled={!validation.valid}>
+              <FileImage size={17} />
+              PNG
+            </button>
+          </div>
         </div>
       </header>
 

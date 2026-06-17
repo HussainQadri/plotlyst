@@ -14,6 +14,9 @@ import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } f
 import type { ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
 
+const labelSnapThreshold = 8;
+const toolbarWidth = 306;
+
 type ChartCanvasProps = {
   project: ChartProject;
   selectedId: string | null;
@@ -76,12 +79,16 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
     if (!drag) return;
     const point = svgPoint(event);
     if (!point) return;
+    const nextDx = drag.baseDx + point.x - drag.startX;
+    const nextDy = drag.baseDy + point.y - drag.startY;
+    const snapped = Math.abs(nextDx) <= labelSnapThreshold && Math.abs(nextDy) <= labelSnapThreshold;
     onUpdateOverride(drag.id, {
-      labelOffset: {
-        dx: drag.baseDx + point.x - drag.startX,
-        dy: drag.baseDy + point.y - drag.startY
-      }
+      labelOffset: snapped ? { dx: 0, dy: 0 } : { dx: nextDx, dy: nextDy }
     });
+  }
+
+  function resetLabelPosition(id: string) {
+    onUpdateOverride(id, { labelOffset: undefined });
   }
 
   return (
@@ -112,6 +119,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
             onResetOverride={onResetOverride}
+            onResetLabelPosition={resetLabelPosition}
             onAddElement={onAddElement}
             onDeleteElement={onDeleteElement}
           />
@@ -124,6 +132,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
             onResetOverride={onResetOverride}
+            onResetLabelPosition={resetLabelPosition}
             onAddElement={onAddElement}
             onDeleteElement={onDeleteElement}
           />
@@ -136,6 +145,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
             onResetOverride={onResetOverride}
+            onResetLabelPosition={resetLabelPosition}
             onAddElement={onAddElement}
             onDeleteElement={onDeleteElement}
           />
@@ -161,6 +171,7 @@ function PieChart({
   onStartLabelDrag,
   onUpdateOverride,
   onResetOverride,
+  onResetLabelPosition,
   onAddElement,
   onDeleteElement
 }: {
@@ -170,6 +181,7 @@ function PieChart({
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
+  onResetLabelPosition: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
@@ -212,8 +224,8 @@ function PieChart({
             <path
               d={describeArc(cx, cy, radius, slice.startAngle, slice.endAngle)}
               fill={slice.color}
-              stroke={selectedId === slice.id ? "#101828" : project.theme.background}
-              strokeWidth={selectedId === slice.id ? 5 : 2}
+              stroke={selectedId === slice.id ? "#174f51" : project.theme.background}
+              strokeWidth={selectedId === slice.id ? 4 : 2}
               className="selectable-mark"
               onClick={(event) => {
                 event.stopPropagation();
@@ -221,7 +233,15 @@ function PieChart({
               }}
             />
             {slice.labelVisible ? (
-              <ChartLabel id={slice.id} label={label} point={labelPoint} muted={project.theme.muted} selected={selectedId === slice.id} onStartDrag={onStartLabelDrag} />
+              <ChartLabel
+                id={slice.id}
+                label={label}
+                point={labelPoint}
+                muted={project.theme.muted}
+                selected={selectedId === slice.id}
+                onStartDrag={onStartLabelDrag}
+                onResetPosition={onResetLabelPosition}
+              />
             ) : null}
           </g>
         );
@@ -230,12 +250,13 @@ function PieChart({
       {selectedId && selectedSliceAnchor ? (
         <CanvasToolbar
           id={selectedId}
-          x={clamp(selectedSliceAnchor.x + 14, 24, 710)}
+          x={clamp(selectedSliceAnchor.x + 14, 24, 960 - toolbarWidth - 24)}
           y={clamp(selectedSliceAnchor.y - 24, 86, 420)}
           palette={project.theme.palette}
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
           onResetOverride={onResetOverride}
+          onResetLabelPosition={onResetLabelPosition}
           onAddElement={onAddElement}
           onDeleteElement={onDeleteElement}
         />
@@ -251,6 +272,7 @@ function MarimekkoChart({
   onStartLabelDrag,
   onUpdateOverride,
   onResetOverride,
+  onResetLabelPosition,
   onAddElement,
   onDeleteElement
 }: {
@@ -260,6 +282,7 @@ function MarimekkoChart({
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
+  onResetLabelPosition: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
@@ -270,7 +293,7 @@ function MarimekkoChart({
   const data = project.data as MarimekkoData;
   const segments = layoutMarimekko(data, project.theme.palette, project.visualOverrides, width, height);
   const selectedSegment = selectedId ? segments.find((segment) => segment.id === selectedId) : null;
-  const toolbarX = selectedSegment ? clamp(selectedSegment.x + selectedSegment.width / 2 - 130, 0, width - 260) : 0;
+  const toolbarX = selectedSegment ? clamp(selectedSegment.x + selectedSegment.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
   const toolbarY = selectedSegment ? clamp(selectedSegment.y - 50, -56, height - 44) : -50;
   const columnLabels = data.columns.map((column) => ({
     label: column.label,
@@ -294,6 +317,7 @@ function MarimekkoChart({
           offset={project.visualOverrides[segment.id]?.labelOffset}
           onSelect={onSelect}
           onStartLabelDrag={onStartLabelDrag}
+          onResetLabelPosition={onResetLabelPosition}
         />
       ))}
       {columnLabels.map((column) => (
@@ -317,6 +341,7 @@ function MarimekkoChart({
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
           onResetOverride={onResetOverride}
+          onResetLabelPosition={onResetLabelPosition}
           onAddElement={onAddElement}
           onDeleteElement={onDeleteElement}
         />
@@ -335,7 +360,8 @@ function MarimekkoSegment({
   chartHeight,
   offset,
   onSelect,
-  onStartLabelDrag
+  onStartLabelDrag,
+  onResetLabelPosition
 }: {
   segment: MarimekkoSegmentLayout;
   selected: boolean;
@@ -347,6 +373,7 @@ function MarimekkoSegment({
   offset?: { dx: number; dy: number };
   onSelect: (id: string) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
+  onResetLabelPosition: (id: string) => void;
 }) {
   const labelPoint = rectLabelPoint({
     rect: { x: segment.x, y: segment.y, width: segment.width, height: segment.height },
@@ -366,7 +393,7 @@ function MarimekkoSegment({
         width={segment.width}
         height={segment.height}
         fill={segment.color}
-        stroke={selected ? "#101828" : "#ffffff"}
+        stroke={selected ? "#174f51" : "#fffcf6"}
         strokeWidth={selected ? 4 : 1.5}
         className="selectable-mark"
         onClick={(event) => {
@@ -375,7 +402,15 @@ function MarimekkoSegment({
         }}
       />
       {segment.labelVisible ? (
-        <ChartLabel id={segment.id} label={label} point={labelPoint} muted={themeMuted} selected={selected} onStartDrag={onStartLabelDrag} />
+        <ChartLabel
+          id={segment.id}
+          label={label}
+          point={labelPoint}
+          muted={themeMuted}
+          selected={selected}
+          onStartDrag={onStartLabelDrag}
+          onResetPosition={onResetLabelPosition}
+        />
       ) : null}
     </g>
   );
@@ -388,6 +423,7 @@ function WaterfallChart({
   onStartLabelDrag,
   onUpdateOverride,
   onResetOverride,
+  onResetLabelPosition,
   onAddElement,
   onDeleteElement
 }: {
@@ -397,6 +433,7 @@ function WaterfallChart({
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
+  onResetLabelPosition: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
@@ -407,12 +444,29 @@ function WaterfallChart({
   const data = project.data as WaterfallData;
   const bars = layoutWaterfall(data, project.theme.palette, project.visualOverrides, width, height);
   const selectedBar = selectedId ? bars.find((bar) => bar.id === selectedId) : null;
-  const toolbarX = selectedBar ? clamp(selectedBar.x + selectedBar.width / 2 - 130, 0, width - 260) : 0;
+  const toolbarX = selectedBar ? clamp(selectedBar.x + selectedBar.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
   const toolbarY = selectedBar ? clamp(selectedBar.y - 50, -56, height - 44) : -50;
 
   return (
     <g transform={`translate(${x} ${y})`}>
-      <line x1="0" x2={width} y1={bars[0]?.baseline ?? height} y2={bars[0]?.baseline ?? height} stroke={project.theme.grid} />
+      <line x1="0" x2={width} y1={bars[0]?.baseline ?? height} y2={bars[0]?.baseline ?? height} stroke={project.theme.grid} strokeWidth="1.2" />
+      {bars.slice(0, -1).map((bar, index) => {
+        const next = bars[index + 1];
+        const endY = bar.kind === "start" || bar.kind === "total" ? bar.y : bar.amount >= 0 ? bar.y : bar.y + bar.height;
+        const nextY = next.kind === "total" || next.kind === "start" ? next.y : next.amount >= 0 ? next.y + next.height : next.y;
+        return (
+          <line
+            key={`${bar.id}-${next.id}`}
+            x1={bar.x + bar.width}
+            y1={endY}
+            x2={next.x}
+            y2={nextY}
+            stroke={project.theme.grid}
+            strokeWidth="1.4"
+            strokeDasharray="4 3"
+          />
+        );
+      })}
       {bars.map((bar) => (
         <WaterfallBar
           key={bar.id}
@@ -424,6 +478,7 @@ function WaterfallChart({
           offset={project.visualOverrides[bar.id]?.labelOffset}
           onSelect={onSelect}
           onStartLabelDrag={onStartLabelDrag}
+          onResetLabelPosition={onResetLabelPosition}
         />
       ))}
       {selectedId && selectedBar ? (
@@ -435,6 +490,7 @@ function WaterfallChart({
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
           onResetOverride={onResetOverride}
+          onResetLabelPosition={onResetLabelPosition}
           onAddElement={onAddElement}
           onDeleteElement={onDeleteElement}
         />
@@ -451,7 +507,8 @@ function WaterfallBar({
   themeMuted,
   offset,
   onSelect,
-  onStartLabelDrag
+  onStartLabelDrag,
+  onResetLabelPosition
 }: {
   bar: WaterfallBarLayout;
   selected: boolean;
@@ -461,8 +518,10 @@ function WaterfallBar({
   offset?: { dx: number; dy: number };
   onSelect: (id: string) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
+  onResetLabelPosition: (id: string) => void;
 }) {
   const valueLabel = bar.displayValue >= 0 ? `+${bar.displayValue}` : `${bar.displayValue}`;
+  const labelValue = bar.kind === "start" || bar.kind === "total" ? `${bar.displayValue}` : valueLabel;
   const point = waterfallLabelPoint({
     rect: { x: bar.x, y: bar.y, width: bar.width, height: bar.height },
     placement: bar.labelPlacement,
@@ -478,7 +537,7 @@ function WaterfallBar({
         width={bar.width}
         height={bar.height}
         fill={bar.color}
-        stroke={selected ? "#101828" : "#ffffff"}
+        stroke={selected ? "#174f51" : "#fffcf6"}
         strokeWidth={selected ? 4 : 1.5}
         className="selectable-mark"
         onClick={(event) => {
@@ -488,8 +547,16 @@ function WaterfallBar({
       />
       {bar.labelVisible ? (
         <>
-          <ChartLabel id={bar.id} label={showValues ? valueLabel : bar.label} point={point} muted={themeMuted} selected={selected} onStartDrag={onStartLabelDrag} />
-          <text x={bar.x + bar.width / 2} y={350} textAnchor="middle" className="svg-axis" fill="#344054">
+          <ChartLabel
+            id={bar.id}
+            label={showValues ? labelValue : bar.label}
+            point={point}
+            muted={themeMuted}
+            selected={selected}
+            onStartDrag={onStartLabelDrag}
+            onResetPosition={onResetLabelPosition}
+          />
+          <text x={bar.x + bar.width / 2} y={350} textAnchor="middle" className="svg-axis" fill={themeForeground}>
             {bar.label}
           </text>
         </>
@@ -504,7 +571,8 @@ function ChartLabel({
   point,
   muted,
   selected,
-  onStartDrag
+  onStartDrag,
+  onResetPosition
 }: {
   id: string;
   label: string;
@@ -512,6 +580,7 @@ function ChartLabel({
   muted: string;
   selected: boolean;
   onStartDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
+  onResetPosition: (id: string) => void;
 }) {
   return (
     <g onClick={(event) => event.stopPropagation()}>
@@ -533,6 +602,10 @@ function ChartLabel({
         className={`${point.className} label-handle${selected ? " selected" : ""}`}
         fill={point.fill}
         onPointerDown={(event) => onStartDrag(id, event)}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          onResetPosition(id);
+        }}
       >
         {label}
       </text>
@@ -548,6 +621,7 @@ function CanvasToolbar({
   override,
   onUpdateOverride,
   onResetOverride,
+  onResetLabelPosition,
   onAddElement,
   onDeleteElement
 }: {
@@ -558,6 +632,7 @@ function CanvasToolbar({
   override: VisualOverride;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
+  onResetLabelPosition: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
@@ -570,17 +645,18 @@ function CanvasToolbar({
 
   return (
     <g transform={`translate(${x} ${y})`} className="canvas-toolbar" data-export-hidden="true" onClick={stop}>
-      <rect x="0" y="0" width="260" height="42" rx="8" fill="#ffffff" stroke="#cfc8bd" />
+      <rect x="0" y="0" width={toolbarWidth} height="42" rx="6" fill="#fffcf6" stroke="#cfc8bd" />
       {palette.slice(0, 4).map((color, index) => (
         <g key={color} className="toolbar-hit" onClick={() => onUpdateOverride(id, { fill: color })}>
           <rect x={10 + index * 24} y="10" width="18" height="22" rx="4" fill={color} stroke="#ffffff" />
         </g>
       ))}
-      <ToolbarText x={114} label="Reset" onClick={() => onResetOverride(id)} />
-      <ToolbarText x={154} label={labelVisible ? "Hide" : "Show"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
-      <ToolbarText x={194} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
-      <ToolbarText x={226} label="+" onClick={() => onAddElement(id)} />
-      <ToolbarText x={246} label="x" onClick={() => onDeleteElement(id)} danger />
+      <ToolbarText x={112} label="Align" onClick={() => onResetLabelPosition(id)} />
+      <ToolbarText x={154} label="Reset" onClick={() => onResetOverride(id)} />
+      <ToolbarText x={198} label={labelVisible ? "Hide" : "Show"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
+      <ToolbarText x={240} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
+      <ToolbarText x={276} label="+" onClick={() => onAddElement(id)} />
+      <ToolbarText x={296} label="x" onClick={() => onDeleteElement(id)} danger />
     </g>
   );
 }
@@ -600,7 +676,7 @@ function ToolbarText({
   return (
     <g className="toolbar-hit" onClick={onClick}>
       <rect x={x - width / 2} y="7" width={width} height="28" rx="5" fill="transparent" />
-      <text x={x} y="26" textAnchor="middle" className="toolbar-text" fill={danger ? "#b42318" : "#111827"}>
+      <text x={x} y="26" textAnchor="middle" className="toolbar-text" fill={danger ? "#a9362d" : "#191919"}>
         {label}
       </text>
     </g>

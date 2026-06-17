@@ -21,7 +21,7 @@ export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps
   return (
     <div className="panel-section data-panel">
       <div className="section-title">Data</div>
-      <p className="hint">Paste rows from a spreadsheet into the table.</p>
+      <p className="hint">{dataSummary(project)}</p>
       {project.type === "pie" && "rows" in project.data ? (
         <PieDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
       ) : null}
@@ -396,49 +396,38 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
 
   return (
     <>
-      <table className="data-table" onPaste={(event) => handlePaste(event, pasteRows)}>
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Amount</th>
-            <th>Kind</th>
-            <th aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.map((row) => (
-            <tr key={row.id} className={project.visualOverrides[row.id] ? "has-override" : ""}>
-              <td>
-                <input
-                  value={row.label}
-                  onFocus={() => setSelectedId(row.id)}
-                  onChange={(event) => updateRow(row.id, "label", event.target.value)}
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  value={row.amount}
-                  onFocus={() => setSelectedId(row.id)}
-                  onChange={(event) => updateRow(row.id, "amount", event.target.value)}
-                />
-              </td>
-              <td>
-                <select value={row.kind} onFocus={() => setSelectedId(row.id)} onChange={(event) => updateRow(row.id, "kind", event.target.value)}>
-                  <option value="start">Start</option>
-                  <option value="change">Change</option>
-                  <option value="total">Total</option>
-                </select>
-              </td>
-              <td>
-                <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Remove row">
-                  <Trash2 size={15} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="waterfall-row-list" onPaste={(event) => handlePaste(event, pasteRows)}>
+        {data.rows.map((row, index) => (
+          <div key={row.id} className={`data-row-card ${project.visualOverrides[row.id] ? "has-override" : ""}`}>
+            <div className="row-card-head">
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <input
+                value={row.label}
+                onFocus={() => setSelectedId(row.id)}
+                onChange={(event) => updateRow(row.id, "label", event.target.value)}
+                aria-label="Waterfall label"
+              />
+            </div>
+            <div className="row-card-controls">
+              <input
+                type="number"
+                value={row.amount}
+                onFocus={() => setSelectedId(row.id)}
+                onChange={(event) => updateRow(row.id, "amount", event.target.value)}
+                aria-label="Waterfall amount"
+              />
+              <select value={row.kind} onFocus={() => setSelectedId(row.id)} onChange={(event) => updateRow(row.id, "kind", event.target.value)} aria-label="Waterfall kind">
+                <option value="start">Start</option>
+                <option value="change">Change</option>
+                <option value="total">Total</option>
+              </select>
+              <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Remove row">
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
       <button className="action-button full" type="button" onClick={addRow}>
         <Plus size={16} />
         Add bar
@@ -463,6 +452,23 @@ function makeId(prefix: string): string {
 
 function firstSegmentLabel(data: MarimekkoData, segmentIndex: number): string {
   return data.columns.find((column) => column.segments[segmentIndex])?.segments[segmentIndex]?.label ?? `Segment ${segmentIndex + 1}`;
+}
+
+function dataSummary(project: ChartProject): string {
+  if (project.type === "pie" && "rows" in project.data) {
+    return `${project.data.rows.length} slices`;
+  }
+
+  if (project.type === "marimekko" && "columns" in project.data) {
+    const segmentCount = Math.max(0, ...project.data.columns.map((column) => column.segments.length));
+    return `${project.data.columns.length} columns / ${segmentCount} segments`;
+  }
+
+  if (project.type === "waterfall" && "rows" in project.data) {
+    return `${project.data.rows.length} bars`;
+  }
+
+  return "Chart data";
 }
 
 function normalizeKind(value: string | undefined): WaterfallKind | null {
