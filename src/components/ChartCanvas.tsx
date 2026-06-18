@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useRef, useState } from "react";
+import { AlignCenterHorizontal, Eye, EyeOff, MapPin, Plus, RotateCcw, Trash2, type LucideIcon } from "lucide-react";
 import { resolveAnnotations } from "@/lib/annotations";
 import {
   describeArc,
@@ -22,18 +23,19 @@ const toolbarWidth = 306;
 type ChartCanvasProps = {
   project: ChartProject;
   selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
+  selectedIds: string[];
+  onSelect: (id: string | null, options?: { additive?: boolean }) => void;
+  onUpdateOverride: (id: string, next: Partial<VisualOverride>, options?: { coalesce?: boolean }) => void;
   onResetOverride: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
-  onUpdateAnnotation: (id: string, next: Partial<Annotation>) => void;
+  onUpdateAnnotation: (id: string, next: Partial<Annotation>, options?: { coalesce?: boolean }) => void;
   onDeleteAnnotation: (id: string) => void;
   validation: ValidationResult;
 };
 
 export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function ChartCanvas(
-  { project, selectedId, onSelect, onUpdateOverride, onResetOverride, onAddElement, onDeleteElement, onUpdateAnnotation, onDeleteAnnotation, validation },
+  { project, selectedId, selectedIds, onSelect, onUpdateOverride, onResetOverride, onAddElement, onDeleteElement, onUpdateAnnotation, onDeleteAnnotation, validation },
   ref
 ) {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -99,9 +101,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
     const snapped = Math.abs(nextDx) <= labelSnapThreshold && Math.abs(nextDy) <= labelSnapThreshold;
     const labelOffset = snapped ? { dx: 0, dy: 0 } : { dx: nextDx, dy: nextDy };
     if (drag.kind === "annotation") {
-      onUpdateAnnotation(drag.id, { labelOffset });
+      onUpdateAnnotation(drag.id, { labelOffset }, { coalesce: true });
     } else {
-      onUpdateOverride(drag.id, { labelOffset });
+      onUpdateOverride(drag.id, { labelOffset }, { coalesce: true });
     }
   }
 
@@ -133,6 +135,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
           <PieChart
             project={project}
             selectedId={selectedId}
+            selectedIds={selectedIds}
             onSelect={onSelect}
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
@@ -146,6 +149,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
           <MarimekkoChart
             project={project}
             selectedId={selectedId}
+            selectedIds={selectedIds}
             onSelect={onSelect}
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
@@ -159,6 +163,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
           <WaterfallChart
             project={project}
             selectedId={selectedId}
+            selectedIds={selectedIds}
             onSelect={onSelect}
             onStartLabelDrag={startLabelDrag}
             onUpdateOverride={onUpdateOverride}
@@ -171,7 +176,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
 
         <AnnotationsLayer
           project={project}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           onSelect={onSelect}
           onStartDrag={startAnnotationDrag}
           onUpdateAnnotation={onUpdateAnnotation}
@@ -194,6 +199,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
 function PieChart({
   project,
   selectedId,
+  selectedIds,
   onSelect,
   onStartLabelDrag,
   onUpdateOverride,
@@ -204,7 +210,8 @@ function PieChart({
 }: {
   project: ChartProject;
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
@@ -271,12 +278,12 @@ function PieChart({
             <path
               d={describeArc(cx, cy, radius, slice.startAngle, slice.endAngle)}
               fill={slice.color}
-              stroke={selectedId === slice.id ? "#174f51" : project.theme.background}
-              strokeWidth={selectedId === slice.id ? 4 : 2}
+              stroke={selectedIds.includes(slice.id) ? "#174f51" : project.theme.background}
+              strokeWidth={selectedIds.includes(slice.id) ? 4 : 2}
               className="selectable-mark"
               onClick={(event) => {
                 event.stopPropagation();
-                onSelect(slice.id);
+                onSelect(slice.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
               }}
             />
             {slice.labelVisible && label && label.lines.length > 0 ? (
@@ -285,7 +292,7 @@ function PieChart({
                 lines={label.lines}
                 point={label.point}
                 muted={project.theme.muted}
-                selected={selectedId === slice.id}
+                selected={selectedIds.includes(slice.id)}
                 onStartDrag={onStartLabelDrag}
                 onResetPosition={onResetLabelPosition}
               />
@@ -314,15 +321,15 @@ function PieChart({
 
 function AnnotationsLayer({
   project,
-  selectedId,
+  selectedIds,
   onSelect,
   onStartDrag,
   onUpdateAnnotation,
   onDeleteAnnotation
 }: {
   project: ChartProject;
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedIds: string[];
+  onSelect: (id: string | null, options?: { additive?: boolean }) => void;
   onStartDrag: (annotation: Annotation, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateAnnotation: (id: string, next: Partial<Annotation>) => void;
   onDeleteAnnotation: (id: string) => void;
@@ -333,7 +340,7 @@ function AnnotationsLayer({
   return (
     <g className="annotation-layer">
       {annotations.map((item) => {
-        const selected = selectedId === item.annotation.id;
+        const selected = selectedIds.includes(item.annotation.id);
         const stroke = item.annotation.style?.stroke ?? "#174f51";
         const fill = item.annotation.style?.fill ?? "#fffcf6";
         const dashed = item.annotation.style?.dashed ?? item.annotation.type === "valueLine";
@@ -344,7 +351,7 @@ function AnnotationsLayer({
             className={`annotation-object${selected ? " selected" : ""}`}
             onClick={(event) => {
               event.stopPropagation();
-              onSelect(item.annotation.id);
+              onSelect(item.annotation.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
             }}
           >
             {item.annotation.type === "valueLine" && item.anchor.valueLine ? (
@@ -411,6 +418,7 @@ function AnnotationsLayer({
 function MarimekkoChart({
   project,
   selectedId,
+  selectedIds,
   onSelect,
   onStartLabelDrag,
   onUpdateOverride,
@@ -421,7 +429,8 @@ function MarimekkoChart({
 }: {
   project: ChartProject;
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
@@ -464,7 +473,7 @@ function MarimekkoChart({
         <MarimekkoSegment
           key={segment.id}
           segment={segment}
-          selected={selectedId === segment.id}
+          selected={selectedIds.includes(segment.id)}
           settings={project.settings}
           showSegmentPercentages={mekkoSettings.showSegmentPercentages}
           themeForeground={project.theme.foreground}
@@ -558,7 +567,7 @@ function MarimekkoSegment({
   chartWidth: number;
   chartHeight: number;
   offset?: { dx: number; dy: number };
-  onSelect: (id: string) => void;
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onResetLabelPosition: (id: string) => void;
 }) {
@@ -590,7 +599,7 @@ function MarimekkoSegment({
         className="selectable-mark"
         onClick={(event) => {
           event.stopPropagation();
-          onSelect(segment.id);
+          onSelect(segment.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
         }}
       />
       {segment.labelVisible && labelLines.length > 0 ? (
@@ -611,6 +620,7 @@ function MarimekkoSegment({
 function WaterfallChart({
   project,
   selectedId,
+  selectedIds,
   onSelect,
   onStartLabelDrag,
   onUpdateOverride,
@@ -621,7 +631,8 @@ function WaterfallChart({
 }: {
   project: ChartProject;
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
   onResetOverride: (id: string) => void;
@@ -665,7 +676,7 @@ function WaterfallChart({
         <WaterfallBar
           key={bar.id}
           bar={bar}
-          selected={selectedId === bar.id}
+          selected={selectedIds.includes(bar.id)}
           settings={project.settings}
           themeForeground={project.theme.foreground}
           themeMuted={project.theme.muted}
@@ -710,7 +721,7 @@ function WaterfallBar({
   themeForeground: string;
   themeMuted: string;
   offset?: { dx: number; dy: number };
-  onSelect: (id: string) => void;
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onResetLabelPosition: (id: string) => void;
 }) {
@@ -740,7 +751,7 @@ function WaterfallBar({
         className="selectable-mark"
         onClick={(event) => {
           event.stopPropagation();
-          onSelect(bar.id);
+          onSelect(bar.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
         }}
       />
       {bar.labelVisible && labelLines.length > 0 ? (
@@ -853,34 +864,34 @@ function CanvasToolbar({
           <rect x={10 + index * 24} y="10" width="18" height="22" rx="4" fill={color} stroke="#ffffff" />
         </g>
       ))}
-      <ToolbarText x={118} label="Align" onClick={() => onResetLabelPosition(id)} />
-      <ToolbarText x={160} label="Reset" onClick={() => onResetOverride(id)} />
-      <ToolbarText x={206} label={labelVisible ? "Hide" : "Show"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
-      <ToolbarText x={246} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
-      <ToolbarText x={280} label="+" onClick={() => onAddElement(id)} />
-      <ToolbarText x={298} label="x" onClick={() => onDeleteElement(id)} danger />
+      <ToolbarIcon x={116} icon={AlignCenterHorizontal} label="Align label" onClick={() => onResetLabelPosition(id)} />
+      <ToolbarIcon x={150} icon={RotateCcw} label="Reset mark" onClick={() => onResetOverride(id)} />
+      <ToolbarIcon x={184} icon={labelVisible ? EyeOff : Eye} label={labelVisible ? "Hide label" : "Show label"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
+      <ToolbarIcon x={218} icon={MapPin} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
+      <ToolbarIcon x={252} icon={Plus} label="Add mark" onClick={() => onAddElement(id)} />
+      <ToolbarIcon x={286} icon={Trash2} label="Delete mark" onClick={() => onDeleteElement(id)} danger />
     </g>
   );
 }
 
-function ToolbarText({
+function ToolbarIcon({
   x,
+  icon: Icon,
   label,
   danger,
   onClick
 }: {
   x: number;
+  icon: LucideIcon;
   label: string;
   danger?: boolean;
   onClick: () => void;
 }) {
-  const width = label.length > 1 ? 38 : 22;
   return (
     <g className="toolbar-hit" onClick={onClick}>
-      <rect x={x - width / 2} y="7" width={width} height="28" rx="5" fill="transparent" />
-      <text x={x} y="26" textAnchor="middle" className="toolbar-text" fill={danger ? "#a9362d" : "#191919"}>
-        {label}
-      </text>
+      <title>{label}</title>
+      <rect x={x - 13} y="7" width="26" height="28" rx="5" fill="transparent" />
+      <Icon x={x - 7} y="14" size={14} strokeWidth={2.4} color={danger ? "#a9362d" : "#191919"} />
     </g>
   );
 }

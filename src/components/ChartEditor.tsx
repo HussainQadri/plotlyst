@@ -1,7 +1,7 @@
 "use client";
 
-import { Download, FileImage, Palette, RefreshCcw, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, FileImage, Palette, Redo2, RefreshCcw, RotateCcw, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
 import { Inspector } from "./Inspector";
@@ -20,9 +20,44 @@ const chartTypes: Array<{ id: ChartType; label: string }> = [
 
 export function ChartEditor() {
   const [project, setProject] = useState<ChartProject>(() => createSampleProject("pie"));
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ past: ChartProject[]; future: ChartProject[] }>({ past: [], future: [] });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const projectRef = useRef(project);
+  const coalescingRef = useRef(false);
+  const coalesceTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
+  const commitProject = useCallback((action: React.SetStateAction<ChartProject>, options: { coalesce?: boolean } = {}) => {
+    setProject((current) => {
+      const next = typeof action === "function" ? (action as (value: ChartProject) => ChartProject)(current) : action;
+      if (Object.is(next, current)) return current;
+
+      setHistory((state) => {
+        if (options.coalesce && coalescingRef.current) return state;
+        return {
+          past: [...state.past.slice(-59), current],
+          future: []
+        };
+      });
+
+      if (options.coalesce) {
+        coalescingRef.current = true;
+        if (coalesceTimerRef.current) window.clearTimeout(coalesceTimerRef.current);
+        coalesceTimerRef.current = window.setTimeout(() => {
+          coalescingRef.current = false;
+        }, 260);
+      } else {
+        coalescingRef.current = false;
+      }
+
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const stored = loadStoredProject();
@@ -40,28 +75,68 @@ export function ChartEditor() {
     }
   }, [hydrated, project]);
 
+  const undo = useCallback(() => {
+    setHistory((state) => {
+      const previous = state.past.at(-1);
+      if (!previous) return state;
+      setProject(previous);
+      setSelectedIds([]);
+      return {
+        past: state.past.slice(0, -1),
+        future: [projectRef.current, ...state.future]
+      };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setHistory((state) => {
+      const next = state.future[0];
+      if (!next) return state;
+      setProject(next);
+      setSelectedIds([]);
+      return {
+        past: [...state.past, projectRef.current],
+        future: state.future.slice(1)
+      };
+    });
+  }, []);
+
   const validation = useMemo(() => validateProject(project), [project]);
 
   const selectableElements = useMemo(() => getSelectableElements(project), [project]);
+  const selectedId = selectedIds.at(-1) ?? null;
+  const selectedElements = selectableElements.filter((element) => selectedIds.includes(element.id));
   const selectedElement = selectableElements.find((element) => element.id === selectedId) ?? null;
   const selectedAnnotation = project.annotations.find((annotation) => annotation.id === selectedId) ?? null;
 
+  function selectObject(id: string | null, options: { additive?: boolean } = {}) {
+    if (!id) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds((current) => {
+      if (!options.additive) return [id];
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      return [...current, id];
+    });
+  }
+
   function switchChartType(type: ChartType) {
-    setProject(createSampleProject(type));
-    setSelectedId(null);
+    commitProject(createSampleProject(type));
+    setSelectedIds([]);
   }
 
   function resetData() {
-    setProject(createSampleProject(project.type));
-    setSelectedId(null);
+    commitProject(createSampleProject(project.type));
+    setSelectedIds([]);
   }
 
   function resetVisualEdits() {
-    setProject((current) => ({ ...current, visualOverrides: {}, annotations: current.annotations.map((annotation) => ({ ...annotation, labelOffset: undefined })) }));
+    commitProject((current) => ({ ...current, visualOverrides: {}, annotations: current.annotations.map((annotation) => ({ ...annotation, labelOffset: undefined })) }));
   }
 
-  function updateVisualOverride(id: string, next: Partial<VisualOverride>) {
-    setProject((current) => ({
+  const updateVisualOverride = useCallback((id: string, next: Partial<VisualOverride>, options?: { coalesce?: boolean }) => {
+    commitProject((current) => ({
       ...current,
       visualOverrides: {
         ...current.visualOverrides,
@@ -70,11 +145,11 @@ export function ChartEditor() {
           ...next
         }
       }
-    }));
-  }
+    }), options);
+  }, [commitProject]);
 
   function resetVisualOverride(id: string) {
-    setProject((current) => {
+    commitProject((current) => {
       const visualOverrides = { ...current.visualOverrides };
       delete visualOverrides[id];
       return { ...current, visualOverrides };
@@ -82,17 +157,17 @@ export function ChartEditor() {
   }
 
   function addElementAfter(id: string) {
-    setProject((current) => addChartElementAfter(current, id));
+    commitProject((current) => addChartElementAfter(current, id));
   }
 
-  function deleteElement(id: string) {
-    setProject((current) => deleteChartElement(current, id));
-    setSelectedId(null);
-  }
+  const deleteElement = useCallback((id: string) => {
+    commitProject((current) => deleteChartElement(current, id));
+    setSelectedIds([]);
+  }, [commitProject]);
 
   function addAnnotation(anchorId: string, type: Annotation["type"]) {
     const id = makeId("ann");
-    setProject((current) => ({
+    commitProject((current) => ({
       ...current,
       annotations: [
         ...current.annotations,
@@ -106,29 +181,86 @@ export function ChartEditor() {
         }
       ]
     }));
-    setSelectedId(id);
+    setSelectedIds([id]);
   }
 
-  function updateAnnotation(id: string, next: Partial<Annotation>) {
-    setProject((current) => ({
+  const updateAnnotation = useCallback((id: string, next: Partial<Annotation>, options?: { coalesce?: boolean }) => {
+    commitProject((current) => ({
       ...current,
       annotations: current.annotations.map((annotation) => (annotation.id === id ? { ...annotation, ...next } : annotation))
-    }));
-  }
+    }), options);
+  }, [commitProject]);
 
-  function deleteAnnotation(id: string) {
-    setProject((current) => ({ ...current, annotations: current.annotations.filter((annotation) => annotation.id !== id) }));
-    setSelectedId(null);
-  }
+  const deleteAnnotation = useCallback((id: string) => {
+    commitProject((current) => ({ ...current, annotations: current.annotations.filter((annotation) => annotation.id !== id) }));
+    setSelectedIds([]);
+  }, [commitProject]);
 
   function updateTitle(title: string) {
-    setProject((current) => ({ ...current, title }));
+    commitProject((current) => ({ ...current, title }));
   }
 
   function updateTheme(themeId: string) {
     const theme = themes.find((item) => item.id === themeId) ?? themes[0];
-    setProject((current) => ({ ...current, theme }));
+    commitProject((current) => ({ ...current, theme }));
   }
+
+  const nudgeSelection = useCallback((dx: number, dy: number) => {
+    const id = selectedId;
+    if (!id) return false;
+    const annotation = projectRef.current.annotations.find((item) => item.id === id);
+    if (annotation) {
+      const offset = annotation.labelOffset ?? { dx: 0, dy: 0 };
+      updateAnnotation(id, { labelOffset: { dx: offset.dx + dx, dy: offset.dy + dy } }, { coalesce: true });
+      return true;
+    }
+    const element = getSelectableElements(projectRef.current).find((item) => item.id === id);
+    if (!element) return false;
+    const offset = projectRef.current.visualOverrides[id]?.labelOffset ?? { dx: 0, dy: 0 };
+    updateVisualOverride(id, { labelOffset: { dx: offset.dx + dx, dy: offset.dy + dy } }, { coalesce: true });
+    return true;
+  }, [selectedId, updateAnnotation, updateVisualOverride]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const editing = target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      if (editing) return;
+
+      const key = event.key;
+      const mod = event.metaKey || event.ctrlKey;
+      if (mod && key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (mod && key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (key === "Escape") {
+        setSelectedIds([]);
+        return;
+      }
+      if ((key === "Delete" || key === "Backspace") && selectedId) {
+        event.preventDefault();
+        if (selectedAnnotation) deleteAnnotation(selectedId);
+        else if (selectedElement) deleteElement(selectedId);
+        return;
+      }
+      if (key.startsWith("Arrow")) {
+        const amount = event.shiftKey ? 8 : 2;
+        const dx = key === "ArrowLeft" ? -amount : key === "ArrowRight" ? amount : 0;
+        const dy = key === "ArrowUp" ? -amount : key === "ArrowDown" ? amount : 0;
+        if (nudgeSelection(dx, dy)) event.preventDefault();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteAnnotation, deleteElement, nudgeSelection, redo, selectedAnnotation, selectedElement, selectedId, undo]);
 
   function serializeSvg(): string | null {
     if (!svgRef.current) return null;
@@ -215,6 +347,12 @@ export function ChartEditor() {
             <span className={validation.valid ? "status-chip ready" : "status-chip warning"}>
               {validation.valid ? "Ready" : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"}`}
             </span>
+            <button className="icon-button" type="button" onClick={undo} title="Undo" disabled={history.past.length === 0}>
+              <Undo2 size={18} />
+            </button>
+            <button className="icon-button" type="button" onClick={redo} title="Redo" disabled={history.future.length === 0}>
+              <Redo2 size={18} />
+            </button>
             <button className="icon-button" type="button" onClick={resetVisualEdits} title="Reset visual edits">
               <Palette size={18} />
             </button>
@@ -251,7 +389,7 @@ export function ChartEditor() {
             ))}
           </div>
 
-          <DataPanel project={project} setProject={setProject} setSelectedId={setSelectedId} />
+          <DataPanel project={project} setProject={commitProject} setSelectedId={(id) => setSelectedIds(id ? [id] : [])} />
         </aside>
 
         <section className="canvas-zone">
@@ -259,7 +397,8 @@ export function ChartEditor() {
             ref={svgRef}
             project={project}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            selectedIds={selectedIds}
+            onSelect={selectObject}
             onUpdateOverride={updateVisualOverride}
             onResetOverride={resetVisualOverride}
             onAddElement={addElementAfter}
@@ -273,10 +412,11 @@ export function ChartEditor() {
         <aside className="right-panel">
           <Inspector
             project={project}
-            setProject={setProject}
+            setProject={commitProject}
             selectedElement={selectedElement}
+            selectedElements={selectedElements}
             selectedAnnotation={selectedAnnotation}
-            onClearSelection={() => setSelectedId(null)}
+            onClearSelection={() => setSelectedIds([])}
             onAddAnnotation={addAnnotation}
             onUpdateAnnotation={updateAnnotation}
             onDeleteAnnotation={deleteAnnotation}

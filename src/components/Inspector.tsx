@@ -22,6 +22,7 @@ type InspectorProps = {
   project: ChartProject;
   setProject: React.Dispatch<React.SetStateAction<ChartProject>>;
   selectedElement: SelectableElement | null;
+  selectedElements: SelectableElement[];
   selectedAnnotation: Annotation | null;
   onClearSelection: () => void;
   onAddAnnotation: (anchorId: string, type: Annotation["type"]) => void;
@@ -73,7 +74,7 @@ const mekkoOrders: Array<{ id: MekkoSegmentOrder; label: string }> = [
   { id: "descending", label: "Descending" }
 ];
 
-export function Inspector({ project, setProject, selectedElement, selectedAnnotation, onClearSelection, onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation }: InspectorProps) {
+export function Inspector({ project, setProject, selectedElement, selectedElements, selectedAnnotation, onClearSelection, onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation }: InspectorProps) {
   function updateChartSettings(settings: Partial<ChartProject["settings"]>) {
     setProject((current) => ({
       ...current,
@@ -145,6 +146,87 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
     updateLabelContent({ fields });
   }
 
+  if (selectedElements.length > 1) {
+    const firstOverride = project.visualOverrides[selectedElements[0].id] ?? {};
+    const placement = firstOverride.labelPlacement ?? "auto";
+
+    function updateBulk(next: Partial<VisualOverride>) {
+      setProject((current) => ({
+        ...current,
+        visualOverrides: selectedElements.reduce(
+          (overrides, element) => ({
+            ...overrides,
+            [element.id]: {
+              ...(overrides[element.id] ?? {}),
+              ...next
+            }
+          }),
+          { ...current.visualOverrides }
+        )
+      }));
+    }
+
+    function clearBulk() {
+      setProject((current) => {
+        const visualOverrides = { ...current.visualOverrides };
+        selectedElements.forEach((element) => delete visualOverrides[element.id]);
+        return { ...current, visualOverrides };
+      });
+    }
+
+    return (
+      <div className="panel-section inspector">
+        <div className="section-title split">
+          <span>
+            <MousePointer2 size={16} />
+            Bulk edit
+          </span>
+          <button className="table-icon" type="button" onClick={onClearSelection} title="Clear selection">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="selected-summary">
+          <small>Chart / {project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}</small>
+          <span className="pill">{selectedElements.length} marks</span>
+          <strong>{selectedElements.map((element) => element.label).join(", ")}</strong>
+          <small>Bulk color, label visibility, and placement</small>
+        </div>
+
+        <label className="field">
+          <span>Color</span>
+          <input className="color-input" type="color" value={firstOverride.fill ?? "#2f6f73"} onChange={(event) => updateBulk({ fill: event.target.value })} />
+        </label>
+
+        <label className="field">
+          <span>Label placement</span>
+          <select value={placement} onChange={(event) => updateBulk({ labelPlacement: event.target.value as LabelPlacement })}>
+            {placements.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelVisible: false })}>
+          <EyeOff size={16} />
+          Hide labels
+        </button>
+        <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelVisible: true })}>
+          <Eye size={16} />
+          Show labels
+        </button>
+        <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelOffset: undefined })}>
+          Align labels
+        </button>
+        <button className="text-button" type="button" onClick={clearBulk}>
+          Reset bulk visual edits
+        </button>
+      </div>
+    );
+  }
+
   if (selectedAnnotation) {
     const annotation = selectedAnnotation;
     const labelMoved = Boolean(annotation.labelOffset && (annotation.labelOffset.dx !== 0 || annotation.labelOffset.dy !== 0));
@@ -172,7 +254,8 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
         </div>
 
         <div className="selected-summary">
-          <span className="pill">{selectedAnnotation.type}</span>
+          <small>{annotationBreadcrumb(project)}</small>
+          <span className="pill">{annotation.type}</span>
           <strong>{annotation.label || "Annotation"}</strong>
           <small>Anchored to {annotation.anchorIds[0]}</small>
         </div>
@@ -488,6 +571,7 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
       </div>
 
       <div className="selected-summary">
+        <small>{elementBreadcrumb(project, selectedElement)}</small>
         <span className="pill">{selectedElement.kind}</span>
         <strong>{selectedElement.label}</strong>
         <small>Value: {selectedElement.value}</small>
@@ -555,6 +639,16 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
       </button>
     </div>
   );
+}
+
+function elementBreadcrumb(project: ChartProject, element: SelectableElement): string {
+  const type = project.type === "pie" ? "Pie" : project.type === "waterfall" ? "Waterfall" : "Marimekko";
+  return `Chart / ${type} / ${element.label}`;
+}
+
+function annotationBreadcrumb(project: ChartProject): string {
+  const type = project.type === "pie" ? "Pie" : project.type === "waterfall" ? "Waterfall" : "Marimekko";
+  return `Chart / ${type} / Annotation`;
 }
 
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
