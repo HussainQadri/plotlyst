@@ -6,6 +6,7 @@ import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
 import { Inspector } from "./Inspector";
 import { layoutWaterfall } from "@/lib/chartMath";
+import { exportDimensions, safeExportName, watermarkText, type ExportBackground, type ExportMode, type ExportScale, type ExportSettings } from "@/lib/export";
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
@@ -18,10 +19,18 @@ const chartTypes: Array<{ id: ChartType; label: string }> = [
   { id: "waterfall", label: "Waterfall" }
 ];
 
+const defaultExportSettings: ExportSettings = {
+  mode: "draft",
+  scale: 1,
+  background: "theme",
+  filename: ""
+};
+
 export function ChartEditor() {
   const [project, setProject] = useState<ChartProject>(() => createSampleProject("pie"));
   const [history, setHistory] = useState<{ past: ChartProject[]; future: ChartProject[] }>({ past: [], future: [] });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(defaultExportSettings);
   const [hydrated, setHydrated] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const projectRef = useRef(project);
@@ -262,20 +271,31 @@ export function ChartEditor() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [deleteAnnotation, deleteElement, nudgeSelection, redo, selectedAnnotation, selectedElement, selectedId, undo]);
 
-  function serializeSvg(): string | null {
+  function updateExportSettings(next: Partial<ExportSettings>) {
+    setExportSettings((current) => ({ ...current, ...next }));
+  }
+
+  function serializeSvg(settings = exportSettings): string | null {
     if (!svgRef.current) return null;
     const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
     clone.querySelectorAll("[data-export-hidden='true']").forEach((node) => node.remove());
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", "1920");
-    clone.setAttribute("height", "1080");
+    const dimensions = exportDimensions(settings.scale);
+    clone.setAttribute("width", String(dimensions.width));
+    clone.setAttribute("height", String(dimensions.height));
+    if (settings.background === "transparent") {
+      clone.querySelector("rect")?.setAttribute("fill", "transparent");
+    }
+    if (settings.mode === "draft") {
+      addDraftWatermark(clone, watermarkText(project.title));
+    }
     return new XMLSerializer().serializeToString(clone);
   }
 
   function downloadBlob(blob: Blob, extension: string) {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    const safeTitle = project.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "chart";
+    const safeTitle = safeExportName(exportSettings.filename || project.title);
     link.href = url;
     link.download = `${safeTitle}.${extension}`;
     document.body.appendChild(link);
@@ -297,13 +317,16 @@ export function ChartEditor() {
     const image = new Image();
     const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
     image.onload = () => {
+      const dimensions = exportDimensions(exportSettings.scale);
       const canvas = document.createElement("canvas");
-      canvas.width = 1920;
-      canvas.height = 1080;
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
       const context = canvas.getContext("2d");
       if (!context) return;
-      context.fillStyle = project.theme.background;
-      context.fillRect(0, 0, canvas.width, canvas.height);
+      if (exportSettings.background === "theme") {
+        context.fillStyle = project.theme.background;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (blob) downloadBlob(blob, "png");
@@ -422,6 +445,42 @@ export function ChartEditor() {
             onDeleteAnnotation={deleteAnnotation}
           />
 
+          <div className="panel-section export-settings-panel">
+            <div className="section-title">
+              <Download size={16} />
+              Export
+            </div>
+            <div className="format-grid">
+              <label className="field compact-field">
+                <span>Mode</span>
+                <select value={exportSettings.mode} onChange={(event) => updateExportSettings({ mode: event.target.value as ExportMode })}>
+                  <option value="draft">Draft watermark</option>
+                  <option value="clean">Clean</option>
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Scale</span>
+                <select value={exportSettings.scale} onChange={(event) => updateExportSettings({ scale: Number(event.target.value) as ExportScale })}>
+                  <option value={1}>1x - 1920px</option>
+                  <option value={2}>2x - 3840px</option>
+                  <option value={3}>3x - 5760px</option>
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Background</span>
+                <select value={exportSettings.background} onChange={(event) => updateExportSettings({ background: event.target.value as ExportBackground })}>
+                  <option value="theme">Theme</option>
+                  <option value="transparent">Transparent</option>
+                </select>
+              </label>
+            </div>
+            <label className="field compact-field">
+              <span>Filename</span>
+              <input value={exportSettings.filename} placeholder={safeExportName(project.title)} onChange={(event) => updateExportSettings({ filename: event.target.value })} />
+            </label>
+            <p className="quiet">{exportSettings.mode === "draft" ? "Draft exports include a small watermark." : "Clean export is available while checkout is not wired."}</p>
+          </div>
+
           <div className="panel-section">
             <div className="section-title">
               <RotateCcw size={16} />
@@ -441,6 +500,32 @@ export function ChartEditor() {
       </section>
     </main>
   );
+}
+
+function addDraftWatermark(svg: SVGSVGElement, text: string) {
+  const namespace = "http://www.w3.org/2000/svg";
+  const group = document.createElementNS(namespace, "g");
+  const background = document.createElementNS(namespace, "rect");
+  const label = document.createElementNS(namespace, "text");
+
+  group.setAttribute("opacity", "0.78");
+  background.setAttribute("x", "704");
+  background.setAttribute("y", "492");
+  background.setAttribute("width", "192");
+  background.setAttribute("height", "26");
+  background.setAttribute("rx", "6");
+  background.setAttribute("fill", "#fffcf6");
+  background.setAttribute("stroke", "#cfc8bd");
+  label.setAttribute("x", "800");
+  label.setAttribute("y", "510");
+  label.setAttribute("text-anchor", "middle");
+  label.setAttribute("fill", "#696d73");
+  label.setAttribute("font-size", "11");
+  label.setAttribute("font-weight", "850");
+  label.textContent = text;
+
+  group.append(background, label);
+  svg.append(group);
 }
 
 function addChartElementAfter(project: ChartProject, id: string): ChartProject {
