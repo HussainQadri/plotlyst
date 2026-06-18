@@ -32,12 +32,28 @@ export type WaterfallBuildMode = "buildUp" | "buildDown";
 
 export type WaterfallTotalLabelMode = "calculated" | "amount";
 
+export type MekkoMode = "absolute" | "percent";
+
+export type MekkoSegmentOrder = "sheet" | "reverse" | "ascending" | "descending";
+
 export type WaterfallSettings = {
   showConnectors: boolean;
   connectorStyle: WaterfallConnectorStyle;
   buildMode: WaterfallBuildMode;
   forceBaseline: boolean;
   totalLabelMode: WaterfallTotalLabelMode;
+};
+
+export type MekkoSettings = {
+  mode: MekkoMode;
+  showColumnTotals: boolean;
+  showColumnPercentages: boolean;
+  showSegmentPercentages: boolean;
+  showAxis: boolean;
+  showTicks: boolean;
+  showRidge: boolean;
+  segmentOrder: MekkoSegmentOrder;
+  otherThreshold?: number;
 };
 
 export type ChartTheme = {
@@ -80,6 +96,7 @@ export type ChartSettings = {
   showLabels: boolean;
   labelContent: LabelSettings;
   waterfall: WaterfallSettings;
+  mekko: MekkoSettings;
 };
 
 export type PieDatum = {

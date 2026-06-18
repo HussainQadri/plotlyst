@@ -7,6 +7,8 @@ import type {
   LabelContentField,
   LabelPlacement,
   LabelSeparator,
+  MekkoMode,
+  MekkoSegmentOrder,
   NegativeStyle,
   NumberScale,
   SelectableElement,
@@ -60,6 +62,16 @@ const totalLabelModes: Array<{ id: WaterfallTotalLabelMode; label: string }> = [
   { id: "calculated", label: "Calculated" },
   { id: "amount", label: "Row amount" }
 ];
+const mekkoModes: Array<{ id: MekkoMode; label: string }> = [
+  { id: "absolute", label: "Absolute" },
+  { id: "percent", label: "Percent" }
+];
+const mekkoOrders: Array<{ id: MekkoSegmentOrder; label: string }> = [
+  { id: "sheet", label: "Sheet" },
+  { id: "reverse", label: "Reverse" },
+  { id: "ascending", label: "Ascending" },
+  { id: "descending", label: "Descending" }
+];
 
 export function Inspector({ project, setProject, selectedElement, selectedAnnotation, onClearSelection, onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation }: InspectorProps) {
   function updateChartSettings(settings: Partial<ChartProject["settings"]>) {
@@ -108,6 +120,19 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
         ...current.settings,
         waterfall: {
           ...current.settings.waterfall,
+          ...next
+        }
+      }
+    }));
+  }
+
+  function updateMekkoSettings(next: Partial<ChartProject["settings"]["mekko"]>) {
+    setProject((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        mekko: {
+          ...current.settings.mekko,
           ...next
         }
       }
@@ -346,6 +371,74 @@ export function Inspector({ project, setProject, selectedElement, selectedAnnota
               label="Baseline"
               checked={project.settings.waterfall.forceBaseline}
               onChange={() => updateWaterfallSettings({ forceBaseline: !project.settings.waterfall.forceBaseline })}
+            />
+          </div>
+        ) : null}
+
+        {project.type === "marimekko" ? (
+          <div className="settings-block">
+            <div className="subsection-label">Mekko</div>
+            <div className="format-grid">
+              <label className="field compact-field">
+                <span>Mode</span>
+                <select value={project.settings.mekko.mode} onChange={(event) => updateMekkoSettings({ mode: event.target.value as MekkoMode })}>
+                  {mekkoModes.map((mode) => (
+                    <option key={mode.id} value={mode.id}>
+                      {mode.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Order</span>
+                <select value={project.settings.mekko.segmentOrder} onChange={(event) => updateMekkoSettings({ segmentOrder: event.target.value as MekkoSegmentOrder })}>
+                  {mekkoOrders.map((order) => (
+                    <option key={order.id} value={order.id}>
+                      {order.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Other below</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={Math.round((project.settings.mekko.otherThreshold ?? 0) * 100)}
+                  onChange={(event) => updateMekkoSettings({ otherThreshold: Math.max(0, Number(event.target.value)) / 100 || undefined })}
+                />
+              </label>
+            </div>
+            <ToggleRow
+              label="Column totals"
+              checked={project.settings.mekko.showColumnTotals}
+              onChange={() => updateMekkoSettings({ showColumnTotals: !project.settings.mekko.showColumnTotals })}
+            />
+            <ToggleRow
+              label="Column %"
+              checked={project.settings.mekko.showColumnPercentages}
+              onChange={() => updateMekkoSettings({ showColumnPercentages: !project.settings.mekko.showColumnPercentages })}
+            />
+            <ToggleRow
+              label="Segment %"
+              checked={project.settings.mekko.showSegmentPercentages}
+              onChange={() => updateMekkoSettings({ showSegmentPercentages: !project.settings.mekko.showSegmentPercentages })}
+            />
+            <ToggleRow
+              label="Axis"
+              checked={project.settings.mekko.showAxis}
+              onChange={() => updateMekkoSettings({ showAxis: !project.settings.mekko.showAxis })}
+            />
+            <ToggleRow
+              label="Ticks"
+              checked={project.settings.mekko.showTicks}
+              onChange={() => updateMekkoSettings({ showTicks: !project.settings.mekko.showTicks })}
+            />
+            <ToggleRow
+              label="Ridge"
+              checked={project.settings.mekko.showRidge}
+              onChange={() => updateMekkoSettings({ showRidge: !project.settings.mekko.showRidge })}
             />
           </div>
         ) : null}

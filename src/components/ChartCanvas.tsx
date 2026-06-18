@@ -11,7 +11,7 @@ import {
   type PieSliceLayout,
   type WaterfallBarLayout
 } from "@/lib/chartMath";
-import { buildLabelLines } from "@/lib/labels";
+import { buildLabelLines, formatPercent, formatValue } from "@/lib/labels";
 import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
 import type { Annotation, ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
@@ -434,25 +434,39 @@ function MarimekkoChart({
   const width = 736;
   const height = 330;
   const data = project.data as MarimekkoData;
-  const segments = layoutMarimekko(data, project.theme.palette, project.visualOverrides, width, height);
+  const mekkoSettings = project.settings.mekko;
+  const segments = layoutMarimekko(data, project.theme.palette, project.visualOverrides, width, height, mekkoSettings);
   const selectedSegment = selectedId ? segments.find((segment) => segment.id === selectedId) : null;
   const toolbarX = selectedSegment ? clamp(selectedSegment.x + selectedSegment.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
   const toolbarY = selectedSegment ? clamp(selectedSegment.y - 50, -56, height - 44) : -50;
   const columnLabels = data.columns.map((column) => ({
     label: column.label,
     start: segments.find((segment) => segment.columnLabel === column.label)?.x ?? 0,
-    width: segments.find((segment) => segment.columnLabel === column.label)?.width ?? width / data.columns.length
+    width: segments.find((segment) => segment.columnLabel === column.label)?.width ?? width / data.columns.length,
+    total: segments.find((segment) => segment.columnLabel === column.label)?.columnTotal ?? 0,
+    percentage: segments.find((segment) => segment.columnLabel === column.label)?.columnPercentage ?? 0
   }));
+  const ridgePoints = columnLabels
+    .filter((column) => column.width > 0)
+    .map((column) => `${column.start + column.width / 2},${height - column.percentage * height}`);
 
   return (
     <g transform={`translate(${x} ${y})`}>
       <rect x="0" y="0" width={width} height={height} fill="transparent" stroke={project.theme.grid} />
+      {mekkoSettings.showTicks ? (
+        <g>
+          {[0.25, 0.5, 0.75].map((tick) => (
+            <line key={tick} x1="0" x2={width} y1={height - tick * height} y2={height - tick * height} stroke={project.theme.grid} strokeWidth="0.8" strokeDasharray="2 6" />
+          ))}
+        </g>
+      ) : null}
       {segments.map((segment) => (
         <MarimekkoSegment
           key={segment.id}
           segment={segment}
           selected={selectedId === segment.id}
           settings={project.settings}
+          showSegmentPercentages={mekkoSettings.showSegmentPercentages}
           themeForeground={project.theme.foreground}
           themeMuted={project.theme.muted}
           chartWidth={width}
@@ -463,6 +477,34 @@ function MarimekkoChart({
           onResetLabelPosition={onResetLabelPosition}
         />
       ))}
+      {mekkoSettings.showRidge && ridgePoints.length > 1 ? (
+        <polyline points={ridgePoints.join(" ")} fill="none" stroke="#174f51" strokeWidth="2" strokeDasharray="5 4" opacity="0.82" />
+      ) : null}
+      {mekkoSettings.showColumnTotals || mekkoSettings.showColumnPercentages ? (
+        <g>
+          {columnLabels.map((column) => (
+            <text key={`${column.label}-total`} x={column.start + column.width / 2} y="-14" textAnchor="middle" className="svg-mekko-total" fill={project.theme.foreground}>
+              {[
+                mekkoSettings.showColumnTotals ? formatValue(column.total, project.settings.labelContent.valueFormat) : null,
+                mekkoSettings.showColumnPercentages ? formatPercent(column.percentage, project.settings.labelContent.percentDecimals) : null
+              ].filter(Boolean).join(" / ")}
+            </text>
+          ))}
+        </g>
+      ) : null}
+      {mekkoSettings.showAxis ? (
+        <g>
+          <line x1="0" x2="0" y1="0" y2={height} stroke={project.theme.grid} strokeWidth="1.2" />
+          {[0, 0.5, 1].map((tick) => (
+            <g key={tick}>
+              <line x1="-5" x2="0" y1={height - tick * height} y2={height - tick * height} stroke={project.theme.grid} strokeWidth="1.2" />
+              <text x="-12" y={height - tick * height + 4} textAnchor="end" className="svg-axis" fill={project.theme.muted}>
+                {formatPercent(tick, 0)}
+              </text>
+            </g>
+          ))}
+        </g>
+      ) : null}
       {columnLabels.map((column) => (
         <text
           key={column.label}
@@ -497,6 +539,7 @@ function MarimekkoSegment({
   segment,
   selected,
   settings,
+  showSegmentPercentages,
   themeForeground,
   themeMuted,
   chartWidth,
@@ -509,6 +552,7 @@ function MarimekkoSegment({
   segment: MarimekkoSegmentLayout;
   selected: boolean;
   settings: ChartProject["settings"];
+  showSegmentPercentages: boolean;
   themeForeground: string;
   themeMuted: string;
   chartWidth: number;
@@ -529,7 +573,7 @@ function MarimekkoSegment({
   const labelLines = buildLabelLines({
     label: segment.label,
     value: segment.value,
-    percentage: segment.percentage,
+    percentage: showSegmentPercentages ? segment.segmentPercentage : segment.percentage,
     settings
   });
 

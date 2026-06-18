@@ -4,6 +4,9 @@ import type {
   LabelContentField,
   LabelSeparator,
   LabelSettings,
+  MekkoMode,
+  MekkoSegmentOrder,
+  MekkoSettings,
   NegativeStyle,
   NumberFormatSettings,
   NumberScale,
@@ -40,7 +43,8 @@ export function defaultChartSettings(type: ChartType): ChartSettings {
     showTitle: true,
     showLabels: true,
     labelContent: defaultLabelSettings(type),
-    waterfall: defaultWaterfallSettings()
+    waterfall: defaultWaterfallSettings(),
+    mekko: defaultMekkoSettings()
   };
 }
 
@@ -51,6 +55,20 @@ export function defaultWaterfallSettings(): WaterfallSettings {
     buildMode: "buildUp",
     forceBaseline: true,
     totalLabelMode: "calculated"
+  };
+}
+
+export function defaultMekkoSettings(): MekkoSettings {
+  return {
+    mode: "absolute",
+    showColumnTotals: true,
+    showColumnPercentages: true,
+    showSegmentPercentages: false,
+    showAxis: true,
+    showTicks: true,
+    showRidge: false,
+    segmentOrder: "sheet",
+    otherThreshold: undefined
   };
 }
 
@@ -72,7 +90,8 @@ export function normalizeChartSettings(raw: unknown, type: ChartType): ChartSett
       valueFormat: normalizeNumberFormat(rawLabelContent?.valueFormat, defaults.labelContent.valueFormat),
       percentDecimals: clampInteger(rawLabelContent?.percentDecimals, 0, 2, defaults.labelContent.percentDecimals)
     },
-    waterfall: normalizeWaterfallSettings(raw.waterfall, defaults.waterfall)
+    waterfall: normalizeWaterfallSettings(raw.waterfall, defaults.waterfall),
+    mekko: normalizeMekkoSettings(raw.mekko, defaults.mekko)
   };
 }
 
@@ -168,6 +187,23 @@ function normalizeWaterfallSettings(raw: unknown, fallback: WaterfallSettings): 
   };
 }
 
+function normalizeMekkoSettings(raw: unknown, fallback: MekkoSettings): MekkoSettings {
+  if (!isRecord(raw)) return fallback;
+  const threshold = typeof raw.otherThreshold === "number" ? raw.otherThreshold : Number(raw.otherThreshold);
+
+  return {
+    mode: normalizeMekkoMode(raw.mode, fallback.mode),
+    showColumnTotals: typeof raw.showColumnTotals === "boolean" ? raw.showColumnTotals : fallback.showColumnTotals,
+    showColumnPercentages: typeof raw.showColumnPercentages === "boolean" ? raw.showColumnPercentages : fallback.showColumnPercentages,
+    showSegmentPercentages: typeof raw.showSegmentPercentages === "boolean" ? raw.showSegmentPercentages : fallback.showSegmentPercentages,
+    showAxis: typeof raw.showAxis === "boolean" ? raw.showAxis : fallback.showAxis,
+    showTicks: typeof raw.showTicks === "boolean" ? raw.showTicks : fallback.showTicks,
+    showRidge: typeof raw.showRidge === "boolean" ? raw.showRidge : fallback.showRidge,
+    segmentOrder: normalizeMekkoSegmentOrder(raw.segmentOrder, fallback.segmentOrder),
+    otherThreshold: Number.isFinite(threshold) ? Math.min(0.5, Math.max(0, threshold)) : undefined
+  };
+}
+
 function normalizeScale(raw: unknown, fallback: NumberScale): NumberScale {
   if (raw === "none" || raw === "thousands" || raw === "millions") return raw;
   return fallback;
@@ -185,6 +221,16 @@ function normalizeBuildMode(raw: unknown, fallback: WaterfallBuildMode): Waterfa
 
 function normalizeTotalLabelMode(raw: unknown, fallback: WaterfallTotalLabelMode): WaterfallTotalLabelMode {
   if (raw === "calculated" || raw === "amount") return raw;
+  return fallback;
+}
+
+function normalizeMekkoMode(raw: unknown, fallback: MekkoMode): MekkoMode {
+  if (raw === "absolute" || raw === "percent") return raw;
+  return fallback;
+}
+
+function normalizeMekkoSegmentOrder(raw: unknown, fallback: MekkoSegmentOrder): MekkoSegmentOrder {
+  if (raw === "sheet" || raw === "reverse" || raw === "ascending" || raw === "descending") return raw;
   return fallback;
 }
 

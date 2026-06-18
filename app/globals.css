@@ -1005,6 +1005,14 @@ select:disabled {
   font-weight: 780;
 }
 
+.svg-mekko-total {
+  font-size: 11px;
+  font-weight: 850;
+  paint-order: stroke;
+  stroke: rgba(251, 250, 246, 0.9);
+  stroke-width: 3px;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: minmax(300px, 350px) minmax(480px, 1fr);

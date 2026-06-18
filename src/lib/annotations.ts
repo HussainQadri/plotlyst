@@ -66,7 +66,7 @@ export function resolveAnnotationAnchor(project: ChartProject, anchorId: string)
 
   if (project.type === "marimekko") {
     const data = project.data as MarimekkoData;
-    const segment = layoutMarimekko(data, project.theme.palette, project.visualOverrides, 736, 330).find((item) => item.id === anchorId);
+    const segment = layoutMarimekko(data, project.theme.palette, project.visualOverrides, 736, 330, project.settings.mekko).find((item) => item.id === anchorId);
     if (!segment) return null;
     return {
       id: segment.id,

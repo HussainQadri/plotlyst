@@ -1,5 +1,5 @@
-import { defaultWaterfallSettings } from "./labels";
-import type { LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData, WaterfallKind, WaterfallSettings } from "./types";
+import { defaultMekkoSettings, defaultWaterfallSettings } from "./labels";
+import type { LabelPlacement, MarimekkoData, MekkoSettings, PieData, VisualOverride, WaterfallData, WaterfallKind, WaterfallSettings } from "./types";
 
 export type PieSliceLayout = {
   id: string;
@@ -18,6 +18,10 @@ export type MarimekkoSegmentLayout = {
   label: string;
   value: number;
   percentage: number;
+  columnTotal: number;
+  columnPercentage: number;
+  segmentPercentage: number;
+  grandPercentage: number;
   columnLabel: string;
   x: number;
   y: number;
@@ -106,37 +110,56 @@ export function layoutMarimekko(
   palette: string[],
   overrides: Record<string, VisualOverride> = {},
   width = 720,
-  height = 330
+  height = 330,
+  settings: MekkoSettings = defaultMekkoSettings()
 ): MarimekkoSegmentLayout[] {
-  const columnTotals = data.columns.map((column) =>
-    column.segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0)
-  );
+  const projectedColumns = data.columns.map((column) => {
+    const positiveSegments = column.segments.filter((segment) => Number.isFinite(segment.value) && segment.value > 0);
+    const rawTotal = positiveSegments.reduce((sum, segment) => sum + segment.value, 0);
+    const otherThreshold = settings.otherThreshold ?? 0;
+    const grouped =
+      otherThreshold > 0
+        ? groupSmallSegments(positiveSegments, rawTotal, otherThreshold, column.id)
+        : positiveSegments.map((segment) => ({ ...segment, sourceIndex: column.segments.indexOf(segment) }));
+
+    return {
+      column,
+      segments: orderMekkoSegments(grouped, settings.segmentOrder),
+      total: rawTotal
+    };
+  });
+  const columnTotals = projectedColumns.map((column) => column.total);
   const grandTotal = columnTotals.reduce((sum, total) => sum + total, 0);
   let x = 0;
 
-  return data.columns.flatMap((column, columnIndex) => {
-    const columnTotal = columnTotals[columnIndex];
+  return projectedColumns.flatMap(({ column, segments, total: columnTotal }) => {
     const columnWidth = grandTotal > 0 ? (columnTotal / grandTotal) * width : width / Math.max(1, data.columns.length);
     let yFromBottom = height;
 
-    const layouts = column.segments
+    const layouts = segments
       .filter((segment) => Number.isFinite(segment.value) && segment.value > 0)
       .map((segment, segmentIndex) => {
         const segmentHeight = columnTotal > 0 ? (segment.value / columnTotal) * height : 0;
         yFromBottom -= segmentHeight;
         const override = getOverride(overrides, segment.id);
+        const segmentPercentage = columnTotal > 0 ? segment.value / columnTotal : 0;
+        const grandPercentage = grandTotal > 0 ? segment.value / grandTotal : 0;
 
         return {
           id: segment.id,
           label: resolveLabel(segment.label, override),
           value: segment.value,
-          percentage: columnTotal > 0 ? segment.value / columnTotal : 0,
+          percentage: settings.mode === "percent" ? segmentPercentage : grandPercentage,
+          columnTotal,
+          columnPercentage: grandTotal > 0 ? columnTotal / grandTotal : 0,
+          segmentPercentage,
+          grandPercentage,
           columnLabel: column.label,
           x,
           y: yFromBottom,
           width: columnWidth,
           height: segmentHeight,
-          color: resolveColor(palette[segmentIndex % palette.length], segment.color, override),
+          color: resolveColor(palette[(segment.sourceIndex ?? segmentIndex) % palette.length], segment.color, override),
           labelPlacement: resolveLabelPlacement(override, "auto"),
           labelVisible: resolveLabelVisible(override)
         };
@@ -145,6 +168,41 @@ export function layoutMarimekko(
     x += columnWidth;
     return layouts;
   });
+}
+
+type MekkoInputSegment = MarimekkoData["columns"][number]["segments"][number] & { sourceIndex?: number };
+
+function groupSmallSegments(segments: MekkoInputSegment[], columnTotal: number, threshold: number, columnId: string): MekkoInputSegment[] {
+  const small: MekkoInputSegment[] = [];
+  const large: MekkoInputSegment[] = [];
+
+  segments.forEach((segment, index) => {
+    const withIndex = { ...segment, sourceIndex: segment.sourceIndex ?? index };
+    if (columnTotal > 0 && segment.value / columnTotal < threshold) {
+      small.push(withIndex);
+    } else {
+      large.push(withIndex);
+    }
+  });
+
+  if (small.length <= 1) return [...large, ...small];
+
+  return [
+    ...large,
+    {
+      id: `${columnId}-other`,
+      label: "Other",
+      value: small.reduce((sum, segment) => sum + segment.value, 0),
+      sourceIndex: segments.length
+    }
+  ];
+}
+
+function orderMekkoSegments(segments: MekkoInputSegment[], order: MekkoSettings["segmentOrder"]): MekkoInputSegment[] {
+  if (order === "reverse") return [...segments].reverse();
+  if (order === "ascending") return [...segments].sort((a, b) => a.value - b.value);
+  if (order === "descending") return [...segments].sort((a, b) => b.value - a.value);
+  return segments;
 }
 
 export function layoutWaterfall(

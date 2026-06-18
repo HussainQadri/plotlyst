@@ -26,6 +26,72 @@ describe("chart layout math", () => {
     expect(firstColumnHeight).toBeCloseTo(300, 5);
   });
 
+  it("returns Mekko totals and percentages", () => {
+    const segments = layoutMarimekko(sampleMarimekkoData, defaultTheme.palette, {}, 600, 300, {
+      mode: "percent",
+      showColumnTotals: true,
+      showColumnPercentages: true,
+      showSegmentPercentages: true,
+      showAxis: true,
+      showTicks: true,
+      showRidge: false,
+      segmentOrder: "sheet"
+    });
+    const northAmerica = segments.filter((segment) => segment.columnLabel === "North America");
+
+    expect(northAmerica[0].columnTotal).toBe(100);
+    expect(northAmerica[0].columnPercentage).toBeCloseTo(1 / 3, 5);
+    expect(northAmerica[0].segmentPercentage).toBeCloseTo(0.56, 5);
+    expect(northAmerica[0].grandPercentage).toBeCloseTo(56 / 300, 5);
+    expect(northAmerica[0].percentage).toBeCloseTo(0.56, 5);
+  });
+
+  it("sorts Mekko segments without mutating source order", () => {
+    const segments = layoutMarimekko(sampleMarimekkoData, defaultTheme.palette, {}, 600, 300, {
+      mode: "absolute",
+      showColumnTotals: true,
+      showColumnPercentages: true,
+      showSegmentPercentages: false,
+      showAxis: true,
+      showTicks: true,
+      showRidge: false,
+      segmentOrder: "ascending"
+    }).filter((segment) => segment.columnLabel === "North America");
+
+    expect(segments.map((segment) => segment.label)).toEqual(["Hardware", "Services", "Software"]);
+    expect(sampleMarimekkoData.columns[0].segments.map((segment) => segment.label)).toEqual(["Software", "Services", "Hardware"]);
+  });
+
+  it("groups small Mekko segments into Other", () => {
+    const data = {
+      columns: [
+        {
+          id: "c1",
+          label: "Market",
+          segments: [
+            { id: "a", label: "A", value: 90 },
+            { id: "b", label: "B", value: 5 },
+            { id: "c", label: "C", value: 5 }
+          ]
+        }
+      ]
+    };
+    const segments = layoutMarimekko(data, defaultTheme.palette, {}, 600, 300, {
+      mode: "absolute",
+      showColumnTotals: true,
+      showColumnPercentages: true,
+      showSegmentPercentages: false,
+      showAxis: true,
+      showTicks: true,
+      showRidge: false,
+      segmentOrder: "sheet",
+      otherThreshold: 0.1
+    });
+
+    expect(segments.map((segment) => segment.label)).toEqual(["A", "Other"]);
+    expect(segments.find((segment) => segment.label === "Other")?.value).toBe(10);
+  });
+
   it("calculates waterfall cumulative totals and negative changes", () => {
     const bars = layoutWaterfall(sampleWaterfallData, defaultTheme.palette, {}, 600, 300);
     const subtotal = bars.find((bar) => bar.kind === "subtotal");
