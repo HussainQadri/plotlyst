@@ -9,7 +9,7 @@ import { layoutWaterfall } from "@/lib/chartMath";
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
-import type { ChartProject, ChartType, MarimekkoData, PieData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
+import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
 import { validateProject } from "@/lib/validation";
 
 const chartTypes: Array<{ id: ChartType; label: string }> = [
@@ -44,6 +44,7 @@ export function ChartEditor() {
 
   const selectableElements = useMemo(() => getSelectableElements(project), [project]);
   const selectedElement = selectableElements.find((element) => element.id === selectedId) ?? null;
+  const selectedAnnotation = project.annotations.find((annotation) => annotation.id === selectedId) ?? null;
 
   function switchChartType(type: ChartType) {
     setProject(createSampleProject(type));
@@ -56,7 +57,7 @@ export function ChartEditor() {
   }
 
   function resetVisualEdits() {
-    setProject((current) => ({ ...current, visualOverrides: {} }));
+    setProject((current) => ({ ...current, visualOverrides: {}, annotations: current.annotations.map((annotation) => ({ ...annotation, labelOffset: undefined })) }));
   }
 
   function updateVisualOverride(id: string, next: Partial<VisualOverride>) {
@@ -86,6 +87,37 @@ export function ChartEditor() {
 
   function deleteElement(id: string) {
     setProject((current) => deleteChartElement(current, id));
+    setSelectedId(null);
+  }
+
+  function addAnnotation(anchorId: string, type: Annotation["type"]) {
+    const id = makeId("ann");
+    setProject((current) => ({
+      ...current,
+      annotations: [
+        ...current.annotations,
+        {
+          id,
+          type,
+          anchorIds: [anchorId],
+          label: type === "valueLine" ? "Value line" : "Callout",
+          visible: true,
+          style: { stroke: "#174f51", fill: "#fffcf6", dashed: type === "valueLine" }
+        }
+      ]
+    }));
+    setSelectedId(id);
+  }
+
+  function updateAnnotation(id: string, next: Partial<Annotation>) {
+    setProject((current) => ({
+      ...current,
+      annotations: current.annotations.map((annotation) => (annotation.id === id ? { ...annotation, ...next } : annotation))
+    }));
+  }
+
+  function deleteAnnotation(id: string) {
+    setProject((current) => ({ ...current, annotations: current.annotations.filter((annotation) => annotation.id !== id) }));
     setSelectedId(null);
   }
 
@@ -232,6 +264,8 @@ export function ChartEditor() {
             onResetOverride={resetVisualOverride}
             onAddElement={addElementAfter}
             onDeleteElement={deleteElement}
+            onUpdateAnnotation={updateAnnotation}
+            onDeleteAnnotation={deleteAnnotation}
             validation={validation}
           />
         </section>
@@ -241,7 +275,11 @@ export function ChartEditor() {
             project={project}
             setProject={setProject}
             selectedElement={selectedElement}
+            selectedAnnotation={selectedAnnotation}
             onClearSelection={() => setSelectedId(null)}
+            onAddAnnotation={addAnnotation}
+            onUpdateAnnotation={updateAnnotation}
+            onDeleteAnnotation={deleteAnnotation}
           />
 
           <div className="panel-section">
@@ -305,27 +343,30 @@ function addChartElementAfter(project: ChartProject, id: string): ChartProject {
 function deleteChartElement(project: ChartProject, id: string): ChartProject {
   const visualOverrides = { ...project.visualOverrides };
   delete visualOverrides[id];
+  const annotations = project.annotations.filter((annotation) => !annotation.anchorIds.includes(id));
 
   if (project.type === "pie") {
     const data = project.data as PieData;
-    return { ...project, visualOverrides, data: { rows: data.rows.filter((row) => row.id !== id) } };
+    return { ...project, visualOverrides, annotations, data: { rows: data.rows.filter((row) => row.id !== id) } };
   }
 
   if (project.type === "waterfall") {
     const data = project.data as WaterfallData;
-    return { ...project, visualOverrides, data: { rows: data.rows.filter((row) => row.id !== id) } };
+    return { ...project, visualOverrides, annotations, data: { rows: data.rows.filter((row) => row.id !== id) } };
   }
 
   if (project.type === "marimekko") {
     const data = project.data as MarimekkoData;
     const segmentIndex = findMarimekkoSegmentIndex(data, id);
-    if (segmentIndex === -1) return { ...project, visualOverrides };
+    if (segmentIndex === -1) return { ...project, visualOverrides, annotations };
 
     const removedIds = new Set(data.columns.flatMap((column) => column.segments[segmentIndex]?.id ?? []));
     const nextOverrides = Object.fromEntries(Object.entries(visualOverrides).filter(([overrideId]) => !removedIds.has(overrideId)));
+    const nextAnnotations = project.annotations.filter((annotation) => !annotation.anchorIds.some((anchorId) => removedIds.has(anchorId)));
     return {
       ...project,
       visualOverrides: nextOverrides,
+      annotations: nextAnnotations,
       data: {
         columns: data.columns.map((column) => ({
           ...column,
@@ -335,7 +376,7 @@ function deleteChartElement(project: ChartProject, id: string): ChartProject {
     };
   }
 
-  return { ...project, visualOverrides };
+  return { ...project, visualOverrides, annotations };
 }
 
 function findMarimekkoSegmentIndex(data: MarimekkoData, id: string): number {

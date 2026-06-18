@@ -58,6 +58,22 @@ export type VisualOverride = {
   labelOffset?: { dx: number; dy: number };
 };
 
+export type AnnotationType = "differenceArrow" | "totalArrow" | "valueLine" | "connectorNote" | "callout";
+
+export type Annotation = {
+  id: string;
+  type: AnnotationType;
+  anchorIds: string[];
+  label?: string;
+  visible: boolean;
+  style?: {
+    stroke?: string;
+    fill?: string;
+    dashed?: boolean;
+  };
+  labelOffset?: { dx: number; dy: number };
+};
+
 export type ChartSettings = {
   showLegend: boolean;
   showTitle: boolean;
@@ -118,6 +134,7 @@ export type ChartProject = {
   data: ChartData;
   settings: ChartSettings;
   visualOverrides: Record<string, VisualOverride>;
+  annotations: Annotation[];
 };
 
 export type SelectableElement = {

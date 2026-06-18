@@ -1,4 +1,4 @@
-import type { ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
+import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
 import { normalizeChartSettings } from "./labels";
 import { defaultTheme, themes } from "./themes";
 
@@ -47,7 +47,8 @@ function normalizeStoredProject(raw: unknown): ChartProject | null {
     theme: normalizeTheme(raw.theme),
     data,
     settings: normalizeChartSettings(raw.settings, type),
-    visualOverrides: isRecord(raw.visualOverrides) ? (raw.visualOverrides as ChartProject["visualOverrides"]) : {}
+    visualOverrides: isRecord(raw.visualOverrides) ? (raw.visualOverrides as ChartProject["visualOverrides"]) : {},
+    annotations: normalizeAnnotations(raw.annotations)
   };
 }
 
@@ -58,4 +59,39 @@ function normalizeTheme(raw: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeAnnotations(raw: unknown): Annotation[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.flatMap((item): Annotation[] => {
+    if (!isRecord(item)) return [];
+    if (typeof item.id !== "string") return [];
+    if (!isAnnotationType(item.type)) return [];
+    if (!Array.isArray(item.anchorIds) || !item.anchorIds.every((id) => typeof id === "string")) return [];
+
+    return [
+      {
+        id: item.id,
+        type: item.type,
+        anchorIds: item.anchorIds,
+        label: typeof item.label === "string" ? item.label : undefined,
+        visible: typeof item.visible === "boolean" ? item.visible : true,
+        style: isRecord(item.style)
+          ? {
+              stroke: typeof item.style.stroke === "string" ? item.style.stroke : undefined,
+              fill: typeof item.style.fill === "string" ? item.style.fill : undefined,
+              dashed: typeof item.style.dashed === "boolean" ? item.style.dashed : undefined
+            }
+          : undefined,
+        labelOffset: isRecord(item.labelOffset) && typeof item.labelOffset.dx === "number" && typeof item.labelOffset.dy === "number"
+          ? { dx: item.labelOffset.dx, dy: item.labelOffset.dy }
+          : undefined
+      }
+    ];
+  });
+}
+
+function isAnnotationType(value: unknown): value is Annotation["type"] {
+  return value === "differenceArrow" || value === "totalArrow" || value === "valueLine" || value === "connectorNote" || value === "callout";
 }

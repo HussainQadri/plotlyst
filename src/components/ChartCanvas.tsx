@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useRef, useState } from "react";
+import { resolveAnnotations } from "@/lib/annotations";
 import {
   describeArc,
   layoutMarimekko,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/chartMath";
 import { buildLabelLines } from "@/lib/labels";
 import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
-import type { ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
+import type { Annotation, ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
 
 const labelSnapThreshold = 8;
@@ -26,16 +27,19 @@ type ChartCanvasProps = {
   onResetOverride: (id: string) => void;
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
+  onUpdateAnnotation: (id: string, next: Partial<Annotation>) => void;
+  onDeleteAnnotation: (id: string) => void;
   validation: ValidationResult;
 };
 
 export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function ChartCanvas(
-  { project, selectedId, onSelect, onUpdateOverride, onResetOverride, onAddElement, onDeleteElement, validation },
+  { project, selectedId, onSelect, onUpdateOverride, onResetOverride, onAddElement, onDeleteElement, onUpdateAnnotation, onDeleteAnnotation, validation },
   ref
 ) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drag, setDrag] = useState<{
     id: string;
+    kind: "label" | "annotation";
     startX: number;
     startY: number;
     baseDx: number;
@@ -73,7 +77,17 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     onSelect(id);
-    setDrag({ id, startX: point.x, startY: point.y, baseDx: offset.dx, baseDy: offset.dy });
+    setDrag({ id, kind: "label", startX: point.x, startY: point.y, baseDx: offset.dx, baseDy: offset.dy });
+  }
+
+  function startAnnotationDrag(annotation: Annotation, event: React.PointerEvent<SVGTextElement>) {
+    const point = svgPoint(event as unknown as React.PointerEvent<SVGSVGElement>);
+    if (!point) return;
+    const offset = annotation.labelOffset ?? { dx: 0, dy: 0 };
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    onSelect(annotation.id);
+    setDrag({ id: annotation.id, kind: "annotation", startX: point.x, startY: point.y, baseDx: offset.dx, baseDy: offset.dy });
   }
 
   function moveLabel(event: React.PointerEvent<SVGSVGElement>) {
@@ -83,9 +97,12 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
     const nextDx = drag.baseDx + point.x - drag.startX;
     const nextDy = drag.baseDy + point.y - drag.startY;
     const snapped = Math.abs(nextDx) <= labelSnapThreshold && Math.abs(nextDy) <= labelSnapThreshold;
-    onUpdateOverride(drag.id, {
-      labelOffset: snapped ? { dx: 0, dy: 0 } : { dx: nextDx, dy: nextDy }
-    });
+    const labelOffset = snapped ? { dx: 0, dy: 0 } : { dx: nextDx, dy: nextDy };
+    if (drag.kind === "annotation") {
+      onUpdateAnnotation(drag.id, { labelOffset });
+    } else {
+      onUpdateOverride(drag.id, { labelOffset });
+    }
   }
 
   function resetLabelPosition(id: string) {
@@ -151,6 +168,15 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
             onDeleteElement={onDeleteElement}
           />
         ) : null}
+
+        <AnnotationsLayer
+          project={project}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onStartDrag={startAnnotationDrag}
+          onUpdateAnnotation={onUpdateAnnotation}
+          onDeleteAnnotation={onDeleteAnnotation}
+        />
 
         {!validation.valid ? (
           <g>
@@ -282,6 +308,102 @@ function PieChart({
           onDeleteElement={onDeleteElement}
         />
       ) : null}
+    </g>
+  );
+}
+
+function AnnotationsLayer({
+  project,
+  selectedId,
+  onSelect,
+  onStartDrag,
+  onUpdateAnnotation,
+  onDeleteAnnotation
+}: {
+  project: ChartProject;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onStartDrag: (annotation: Annotation, event: React.PointerEvent<SVGTextElement>) => void;
+  onUpdateAnnotation: (id: string, next: Partial<Annotation>) => void;
+  onDeleteAnnotation: (id: string) => void;
+}) {
+  const annotations = resolveAnnotations(project);
+  if (annotations.length === 0) return null;
+
+  return (
+    <g className="annotation-layer">
+      {annotations.map((item) => {
+        const selected = selectedId === item.annotation.id;
+        const stroke = item.annotation.style?.stroke ?? "#174f51";
+        const fill = item.annotation.style?.fill ?? "#fffcf6";
+        const dashed = item.annotation.style?.dashed ?? item.annotation.type === "valueLine";
+
+        return (
+          <g
+            key={item.annotation.id}
+            className={`annotation-object${selected ? " selected" : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect(item.annotation.id);
+            }}
+          >
+            {item.annotation.type === "valueLine" && item.anchor.valueLine ? (
+              <line
+                x1={item.anchor.valueLine.x1}
+                y1={item.anchor.valueLine.y}
+                x2={item.anchor.valueLine.x2}
+                y2={item.anchor.valueLine.y}
+                stroke={stroke}
+                strokeWidth={selected ? 2.2 : 1.6}
+                strokeDasharray={dashed ? "6 5" : undefined}
+              />
+            ) : (
+              <line
+                x1={item.anchorX}
+                y1={item.anchorY}
+                x2={item.labelX}
+                y2={item.labelY - 9}
+                stroke={stroke}
+                strokeWidth={selected ? 2.2 : 1.5}
+                strokeDasharray={dashed ? "5 4" : undefined}
+              />
+            )}
+            <circle cx={item.anchorX} cy={item.anchorY} r={selected ? 4 : 3} fill={stroke} data-export-hidden="true" />
+            <text
+              x={item.labelX}
+              y={item.labelY}
+              textAnchor="start"
+              className="annotation-label"
+              fill={stroke}
+              onPointerDown={(event) => onStartDrag(item.annotation, event)}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                onUpdateAnnotation(item.annotation.id, { labelOffset: undefined });
+              }}
+            >
+              {item.label}
+            </text>
+            {selected ? (
+              <g data-export-hidden="true" transform={`translate(${item.labelX + 8} ${item.labelY + 10})`}>
+                <rect x="0" y="0" width="44" height="22" rx="5" fill={fill} stroke="#cfc8bd" />
+                <text
+                  x="22"
+                  y="15"
+                  textAnchor="middle"
+                  className="toolbar-text"
+                  fill="#a9362d"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeleteAnnotation(item.annotation.id);
+                  }}
+                >
+                  Delete
+                </text>
+              </g>
+            ) : null}
+          </g>
+        );
+      })}
     </g>
   );
 }

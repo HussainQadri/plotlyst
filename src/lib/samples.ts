@@ -73,6 +73,7 @@ export function createSampleProject(type: ChartType): ChartProject {
           ? structuredClone(sampleMarimekkoData)
           : structuredClone(sampleWaterfallData),
     settings: defaultChartSettings(type),
-    visualOverrides: {}
+    visualOverrides: {},
+    annotations: []
   };
 }

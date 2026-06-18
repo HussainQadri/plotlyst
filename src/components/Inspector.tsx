@@ -2,6 +2,7 @@
 
 import { Eye, EyeOff, MousePointer2, Settings2, X } from "lucide-react";
 import type {
+  Annotation,
   ChartProject,
   LabelContentField,
   LabelPlacement,
@@ -19,7 +20,11 @@ type InspectorProps = {
   project: ChartProject;
   setProject: React.Dispatch<React.SetStateAction<ChartProject>>;
   selectedElement: SelectableElement | null;
+  selectedAnnotation: Annotation | null;
   onClearSelection: () => void;
+  onAddAnnotation: (anchorId: string, type: Annotation["type"]) => void;
+  onUpdateAnnotation: (id: string, next: Partial<Annotation>) => void;
+  onDeleteAnnotation: (id: string) => void;
 };
 
 const placements: LabelPlacement[] = ["auto", "inside", "outside", "callout"];
@@ -56,7 +61,7 @@ const totalLabelModes: Array<{ id: WaterfallTotalLabelMode; label: string }> = [
   { id: "amount", label: "Row amount" }
 ];
 
-export function Inspector({ project, setProject, selectedElement, onClearSelection }: InspectorProps) {
+export function Inspector({ project, setProject, selectedElement, selectedAnnotation, onClearSelection, onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation }: InspectorProps) {
   function updateChartSettings(settings: Partial<ChartProject["settings"]>) {
     setProject((current) => ({
       ...current,
@@ -113,6 +118,68 @@ export function Inspector({ project, setProject, selectedElement, onClearSelecti
     const current = project.settings.labelContent.fields;
     const fields = current.includes(field) ? current.filter((item) => item !== field) : [...current, field];
     updateLabelContent({ fields });
+  }
+
+  if (selectedAnnotation) {
+    const annotation = selectedAnnotation;
+    const labelMoved = Boolean(annotation.labelOffset && (annotation.labelOffset.dx !== 0 || annotation.labelOffset.dy !== 0));
+    const stroke = annotation.style?.stroke ?? "#174f51";
+    const dashed = annotation.style?.dashed ?? annotation.type === "valueLine";
+
+    function updateAnnotation(next: Partial<Annotation>) {
+      onUpdateAnnotation(annotation.id, next);
+    }
+
+    function updateAnnotationStyle(next: NonNullable<Annotation["style"]>) {
+      updateAnnotation({ style: { ...(annotation.style ?? {}), ...next } });
+    }
+
+    return (
+      <div className="panel-section inspector">
+        <div className="section-title split">
+          <span>
+            <MousePointer2 size={16} />
+            Annotation
+          </span>
+          <button className="table-icon" type="button" onClick={onClearSelection} title="Clear selection">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="selected-summary">
+          <span className="pill">{selectedAnnotation.type}</span>
+          <strong>{annotation.label || "Annotation"}</strong>
+          <small>Anchored to {annotation.anchorIds[0]}</small>
+        </div>
+
+        <label className="field">
+          <span>Annotation label</span>
+          <input value={annotation.label ?? ""} onChange={(event) => updateAnnotation({ label: event.target.value })} />
+        </label>
+
+        <label className="field">
+          <span>Line color</span>
+          <input className="color-input" type="color" value={stroke} onChange={(event) => updateAnnotationStyle({ stroke: event.target.value })} />
+        </label>
+
+        <button className="action-button ghost full" type="button" onClick={() => updateAnnotation({ visible: !annotation.visible })}>
+          {annotation.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+          {annotation.visible ? "Hide annotation" : "Show annotation"}
+        </button>
+
+        <button className="action-button ghost full" type="button" onClick={() => updateAnnotationStyle({ dashed: !dashed })}>
+          {dashed ? "Solid line" : "Dashed line"}
+        </button>
+
+        <button className="action-button ghost full" type="button" onClick={() => updateAnnotation({ labelOffset: undefined })} disabled={!labelMoved}>
+          Align annotation
+        </button>
+
+        <button className="text-button danger" type="button" onClick={() => onDeleteAnnotation(annotation.id)}>
+          Delete annotation
+        </button>
+      </div>
+    );
   }
 
   if (!selectedElement) {
@@ -374,6 +441,21 @@ export function Inspector({ project, setProject, selectedElement, onClearSelecti
       <button className="action-button ghost full" type="button" onClick={() => updateOverride({ labelOffset: undefined })} disabled={!labelMoved}>
         Align label
       </button>
+
+      <div className="settings-block annotation-actions">
+        <div className="subsection-label">Annotations</div>
+        <button className="action-button ghost full" type="button" onClick={() => onAddAnnotation(selectedElement.id, "callout")}>
+          Add callout
+        </button>
+        <button
+          className="action-button ghost full"
+          type="button"
+          onClick={() => onAddAnnotation(selectedElement.id, "valueLine")}
+          disabled={selectedElement.kind === "slice"}
+        >
+          Add value line
+        </button>
+      </div>
 
       <button className="text-button" type="button" onClick={clearOverride}>
         Reset selected visual edits

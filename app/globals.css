@@ -399,6 +399,14 @@ select:disabled {
   color: var(--ink);
 }
 
+.text-button.danger {
+  color: var(--danger);
+}
+
+.text-button.danger:hover {
+  color: #7f261f;
+}
+
 .hint,
 .quiet {
   margin: 0 0 var(--space-3);
@@ -942,6 +950,34 @@ select:disabled {
 .toolbar-text {
   font-size: 10px;
   font-weight: 900;
+}
+
+.annotation-object {
+  cursor: pointer;
+}
+
+.annotation-object line {
+  vector-effect: non-scaling-stroke;
+}
+
+.annotation-label {
+  cursor: grab;
+  font-size: 12px;
+  font-weight: 850;
+  paint-order: stroke;
+  stroke: rgba(251, 250, 246, 0.82);
+  stroke-width: 4px;
+  user-select: none;
+}
+
+.annotation-object.selected .annotation-label {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.annotation-label:active {
+  cursor: grabbing;
 }
 
 .svg-title {
