@@ -10,6 +10,7 @@ import {
   type PieSliceLayout,
   type WaterfallBarLayout
 } from "@/lib/chartMath";
+import { buildLabelLines } from "@/lib/labels";
 import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
 import type { ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
@@ -190,6 +191,37 @@ function PieChart({
   const cx = 360;
   const cy = 286;
   const radius = 142;
+  const labelData = slices.map((slice) => {
+    const mid = (slice.startAngle + slice.endAngle) / 2;
+    const offset = project.visualOverrides[slice.id]?.labelOffset;
+    return {
+      id: slice.id,
+      point: pieLabelPoint({
+        cx,
+        cy,
+        radius,
+        midAngle: mid,
+        percentage: slice.percentage,
+        placement: slice.labelPlacement,
+        offset,
+        foreground: project.theme.foreground
+      }),
+      lines: buildLabelLines({
+        label: slice.label,
+        percentage: slice.percentage,
+        value: slice.value,
+        settings: project.settings
+      }),
+      manuallyPlaced: Boolean(offset && (offset.dx !== 0 || offset.dy !== 0))
+    };
+  });
+  adjustLabelCollisions(
+    labelData
+      .filter((item) => item.lines.length > 0 && !item.manuallyPlaced && item.point.anchor !== "middle")
+      .map((item) => ({ point: item.point, lineCount: item.lines.length })),
+    { minY: 94, maxY: 430, minGap: 18 }
+  );
+  const labelMap = new Map(labelData.map((item) => [item.id, item]));
   const selectedSlice = selectedId ? slices.find((slice) => slice.id === selectedId) : null;
   const selectedSliceAnchor = selectedSlice
     ? pieLabelPoint({
@@ -206,18 +238,7 @@ function PieChart({
   return (
     <g>
       {slices.map((slice) => {
-        const mid = (slice.startAngle + slice.endAngle) / 2;
-        const labelPoint = pieLabelPoint({
-          cx,
-          cy,
-          radius,
-          midAngle: mid,
-          percentage: slice.percentage,
-          placement: slice.labelPlacement,
-          offset: project.visualOverrides[slice.id]?.labelOffset,
-          foreground: project.theme.foreground
-        });
-        const label = project.settings.showValues ? `${slice.label} ${(slice.percentage * 100).toFixed(0)}%` : slice.label;
+        const label = labelMap.get(slice.id);
 
         return (
           <g key={slice.id}>
@@ -232,11 +253,11 @@ function PieChart({
                 onSelect(slice.id);
               }}
             />
-            {slice.labelVisible ? (
+            {slice.labelVisible && label && label.lines.length > 0 ? (
               <ChartLabel
                 id={slice.id}
-                label={label}
-                point={labelPoint}
+                lines={label.lines}
+                point={label.point}
                 muted={project.theme.muted}
                 selected={selectedId === slice.id}
                 onStartDrag={onStartLabelDrag}
@@ -309,7 +330,7 @@ function MarimekkoChart({
           key={segment.id}
           segment={segment}
           selected={selectedId === segment.id}
-          showValues={project.settings.showValues}
+          settings={project.settings}
           themeForeground={project.theme.foreground}
           themeMuted={project.theme.muted}
           chartWidth={width}
@@ -353,7 +374,7 @@ function MarimekkoChart({
 function MarimekkoSegment({
   segment,
   selected,
-  showValues,
+  settings,
   themeForeground,
   themeMuted,
   chartWidth,
@@ -365,7 +386,7 @@ function MarimekkoSegment({
 }: {
   segment: MarimekkoSegmentLayout;
   selected: boolean;
-  showValues: boolean;
+  settings: ChartProject["settings"];
   themeForeground: string;
   themeMuted: string;
   chartWidth: number;
@@ -383,7 +404,12 @@ function MarimekkoSegment({
     chartHeight,
     foreground: themeForeground
   });
-  const label = showValues ? `${segment.label} ${segment.value}` : segment.label;
+  const labelLines = buildLabelLines({
+    label: segment.label,
+    value: segment.value,
+    percentage: segment.percentage,
+    settings
+  });
 
   return (
     <g>
@@ -401,10 +427,10 @@ function MarimekkoSegment({
           onSelect(segment.id);
         }}
       />
-      {segment.labelVisible ? (
+      {segment.labelVisible && labelLines.length > 0 ? (
         <ChartLabel
           id={segment.id}
-          label={label}
+          lines={labelLines}
           point={labelPoint}
           muted={themeMuted}
           selected={selected}
@@ -442,37 +468,39 @@ function WaterfallChart({
   const width = 736;
   const height = 320;
   const data = project.data as WaterfallData;
-  const bars = layoutWaterfall(data, project.theme.palette, project.visualOverrides, width, height);
+  const waterfallSettings = project.settings.waterfall;
+  const bars = layoutWaterfall(data, project.theme.palette, project.visualOverrides, width, height, waterfallSettings);
   const selectedBar = selectedId ? bars.find((bar) => bar.id === selectedId) : null;
   const toolbarX = selectedBar ? clamp(selectedBar.x + selectedBar.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
   const toolbarY = selectedBar ? clamp(selectedBar.y - 50, -56, height - 44) : -50;
+  const shouldShowConnectors = waterfallSettings.showConnectors && waterfallSettings.connectorStyle !== "none";
 
   return (
     <g transform={`translate(${x} ${y})`}>
-      <line x1="0" x2={width} y1={bars[0]?.baseline ?? height} y2={bars[0]?.baseline ?? height} stroke={project.theme.grid} strokeWidth="1.2" />
-      {bars.slice(0, -1).map((bar, index) => {
+      {waterfallSettings.forceBaseline ? (
+        <line x1="0" x2={width} y1={bars[0]?.baseline ?? height} y2={bars[0]?.baseline ?? height} stroke={project.theme.grid} strokeWidth="1.2" />
+      ) : null}
+      {shouldShowConnectors ? bars.slice(0, -1).map((bar, index) => {
         const next = bars[index + 1];
-        const endY = bar.kind === "start" || bar.kind === "total" ? bar.y : bar.amount >= 0 ? bar.y : bar.y + bar.height;
-        const nextY = next.kind === "total" || next.kind === "start" ? next.y : next.amount >= 0 ? next.y + next.height : next.y;
         return (
           <line
             key={`${bar.id}-${next.id}`}
             x1={bar.x + bar.width}
-            y1={endY}
+            y1={bar.connectorOutY}
             x2={next.x}
-            y2={nextY}
+            y2={next.connectorInY}
             stroke={project.theme.grid}
             strokeWidth="1.4"
-            strokeDasharray="4 3"
+            strokeDasharray={waterfallSettings.connectorStyle === "dashed" ? "4 3" : undefined}
           />
         );
-      })}
+      }) : null}
       {bars.map((bar) => (
         <WaterfallBar
           key={bar.id}
           bar={bar}
           selected={selectedId === bar.id}
-          showValues={project.settings.showValues}
+          settings={project.settings}
           themeForeground={project.theme.foreground}
           themeMuted={project.theme.muted}
           offset={project.visualOverrides[bar.id]?.labelOffset}
@@ -502,7 +530,7 @@ function WaterfallChart({
 function WaterfallBar({
   bar,
   selected,
-  showValues,
+  settings,
   themeForeground,
   themeMuted,
   offset,
@@ -512,7 +540,7 @@ function WaterfallBar({
 }: {
   bar: WaterfallBarLayout;
   selected: boolean;
-  showValues: boolean;
+  settings: ChartProject["settings"];
   themeForeground: string;
   themeMuted: string;
   offset?: { dx: number; dy: number };
@@ -520,13 +548,17 @@ function WaterfallBar({
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onResetLabelPosition: (id: string) => void;
 }) {
-  const valueLabel = bar.displayValue >= 0 ? `+${bar.displayValue}` : `${bar.displayValue}`;
-  const labelValue = bar.kind === "start" || bar.kind === "total" ? `${bar.displayValue}` : valueLabel;
+  const labelLines = buildLabelLines({
+    label: bar.label,
+    value: bar.displayValue,
+    settings,
+    valueSign: bar.kind === "change" ? "auto" : "plain"
+  });
   const point = waterfallLabelPoint({
     rect: { x: bar.x, y: bar.y, width: bar.width, height: bar.height },
     placement: bar.labelPlacement,
     offset,
-    positive: bar.displayValue >= 0,
+    positive: bar.endValue >= bar.startValue,
     foreground: themeForeground
   });
   return (
@@ -545,29 +577,29 @@ function WaterfallBar({
           onSelect(bar.id);
         }}
       />
-      {bar.labelVisible ? (
+      {bar.labelVisible && labelLines.length > 0 ? (
         <>
           <ChartLabel
             id={bar.id}
-            label={showValues ? labelValue : bar.label}
+            lines={labelLines}
             point={point}
             muted={themeMuted}
             selected={selected}
             onStartDrag={onStartLabelDrag}
             onResetPosition={onResetLabelPosition}
           />
-          <text x={bar.x + bar.width / 2} y={350} textAnchor="middle" className="svg-axis" fill={themeForeground}>
-            {bar.label}
-          </text>
         </>
       ) : null}
+      <text x={bar.x + bar.width / 2} y={350} textAnchor="middle" className="svg-axis" fill={themeForeground}>
+        {bar.label}
+      </text>
     </g>
   );
 }
 
 function ChartLabel({
   id,
-  label,
+  lines,
   point,
   muted,
   selected,
@@ -575,7 +607,7 @@ function ChartLabel({
   onResetPosition
 }: {
   id: string;
-  label: string;
+  lines: string[];
   point: LabelPoint;
   muted: string;
   selected: boolean;
@@ -597,7 +629,7 @@ function ChartLabel({
       ) : null}
       <text
         x={point.x}
-        y={point.y}
+        y={point.y - (lines.length - 1) * 7}
         textAnchor={point.anchor}
         className={`${point.className} label-handle${selected ? " selected" : ""}`}
         fill={point.fill}
@@ -607,7 +639,11 @@ function ChartLabel({
           onResetPosition(id);
         }}
       >
-        {label}
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={point.x} dy={index === 0 ? 0 : 14}>
+            {line}
+          </tspan>
+        ))}
       </text>
     </g>
   );
@@ -695,6 +731,49 @@ function placementLabel(placement: LabelPlacement): string {
   if (placement === "outside") return "Out";
   if (placement === "callout") return "Call";
   return "Auto";
+}
+
+function adjustLabelCollisions(
+  entries: Array<{ point: LabelPoint; lineCount: number }>,
+  bounds: { minY: number; maxY: number; minGap: number }
+) {
+  (["start", "end"] as const).forEach((anchor) => {
+    const group = entries.filter((entry) => entry.point.anchor === anchor).sort((a, b) => a.point.y - b.point.y);
+    if (group.length < 2) return;
+
+    distributeLabels(group, bounds);
+    const overflow = group.at(-1)?.point.y ?? bounds.maxY;
+    if (overflow > bounds.maxY) {
+      const shift = overflow - bounds.maxY;
+      group.forEach((entry) => moveLabelPoint(entry.point, entry.point.y - shift));
+      distributeLabels(group, bounds);
+    }
+  });
+}
+
+function distributeLabels(entries: Array<{ point: LabelPoint; lineCount: number }>, bounds: { minY: number; minGap: number }) {
+  entries.forEach((entry, index) => {
+    if (index === 0) {
+      moveLabelPoint(entry.point, Math.max(bounds.minY, entry.point.y));
+      return;
+    }
+
+    const previous = entries[index - 1];
+    moveLabelPoint(entry.point, Math.max(entry.point.y, previous.point.y + requiredLabelGap(previous, entry, bounds.minGap)));
+  });
+}
+
+function requiredLabelGap(
+  previous: { lineCount: number },
+  next: { lineCount: number },
+  minimum: number
+): number {
+  return Math.max(minimum, ((previous.lineCount + next.lineCount) * 14) / 2 + 4);
+}
+
+function moveLabelPoint(point: LabelPoint, y: number) {
+  point.y = y;
+  if (point.leader) point.leader.y2 = y;
 }
 
 function clamp(value: number, min: number, max: number): number {

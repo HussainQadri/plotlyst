@@ -1,4 +1,5 @@
-import type { LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "./types";
+import { defaultWaterfallSettings } from "./labels";
+import type { LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData, WaterfallKind, WaterfallSettings } from "./types";
 
 export type PieSliceLayout = {
   id: string;
@@ -16,6 +17,7 @@ export type MarimekkoSegmentLayout = {
   id: string;
   label: string;
   value: number;
+  percentage: number;
   columnLabel: string;
   x: number;
   y: number;
@@ -31,9 +33,16 @@ export type WaterfallBarLayout = {
   label: string;
   amount: number;
   displayValue: number;
-  kind: "start" | "change" | "total";
+  percentage?: number;
+  kind: WaterfallKind;
+  startValue: number;
+  endValue: number;
   x: number;
   y: number;
+  startY: number;
+  endY: number;
+  connectorInY: number;
+  connectorOutY: number;
   width: number;
   height: number;
   baseline: number;
@@ -121,6 +130,7 @@ export function layoutMarimekko(
           id: segment.id,
           label: resolveLabel(segment.label, override),
           value: segment.value,
+          percentage: columnTotal > 0 ? segment.value / columnTotal : 0,
           columnLabel: column.label,
           x,
           y: yFromBottom,
@@ -142,9 +152,11 @@ export function layoutWaterfall(
   palette: string[],
   overrides: Record<string, VisualOverride> = {},
   width = 720,
-  height = 320
+  height = 320,
+  settings: WaterfallSettings = defaultWaterfallSettings()
 ): WaterfallBarLayout[] {
   const values: Array<{ start: number; end: number; displayValue: number }> = [];
+  const direction = settings.buildMode === "buildDown" ? -1 : 1;
   let running = 0;
 
   data.rows.forEach((row) => {
@@ -154,19 +166,26 @@ export function layoutWaterfall(
       return;
     }
 
-    if (row.kind === "total") {
-      values.push({ start: 0, end: running, displayValue: running });
+    if (row.kind === "subtotal" || row.kind === "total") {
+      values.push({
+        start: 0,
+        end: running,
+        displayValue: settings.totalLabelMode === "amount" ? row.amount : running
+      });
       return;
     }
 
     const start = running;
-    running += row.amount;
+    running += row.amount * direction;
     values.push({ start, end: running, displayValue: row.amount });
   });
 
-  const domainMin = Math.min(0, ...values.flatMap((value) => [value.start, value.end]));
-  const domainMax = Math.max(0, ...values.flatMap((value) => [value.start, value.end]));
-  const domain = domainMax - domainMin || 1;
+  const domainValues = values.length > 0 ? values.flatMap((value) => [value.start, value.end]) : [0, 1];
+  const rawMin = Math.min(...domainValues);
+  const rawMax = Math.max(...domainValues);
+  const domainMin = settings.forceBaseline ? Math.min(0, rawMin) : rawMin;
+  const domainMax = settings.forceBaseline ? Math.max(0, rawMax) : rawMax;
+  const domain = domainMax - domainMin || Math.max(1, Math.abs(domainMax));
   const barGap = 16;
   const barWidth = Math.max(28, (width - barGap * Math.max(0, data.rows.length - 1)) / Math.max(1, data.rows.length));
 
@@ -183,18 +202,25 @@ export function layoutWaterfall(
     const defaultColor =
       row.kind === "total" || row.kind === "start"
         ? palette[0]
-        : row.amount >= 0
-          ? palette[2] ?? palette[0]
-          : palette[1] ?? palette[0];
-
+        : row.kind === "subtotal"
+          ? palette[4] ?? palette[0]
+          : row.amount >= 0
+            ? palette[2] ?? palette[0]
+            : palette[1] ?? palette[0];
     return {
       id: row.id,
       label: resolveLabel(row.label, override),
       amount: row.amount,
       displayValue: value.displayValue,
       kind: row.kind,
+      startValue: value.start,
+      endValue: value.end,
       x: index * (barWidth + barGap),
       y,
+      startY: yStart,
+      endY: yEnd,
+      connectorInY: row.kind === "change" ? yStart : yEnd,
+      connectorOutY: yEnd,
       width: barWidth,
       height: barHeight,
       baseline,

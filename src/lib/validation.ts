@@ -75,5 +75,8 @@ function validateWaterfall(data: WaterfallData, errors: string[]) {
   data.rows.forEach((row) => {
     if (!row.label.trim()) errors.push("Every waterfall bar needs a label.");
     if (!Number.isFinite(row.amount)) errors.push(`${row.label || "A bar"} needs a numeric amount.`);
+    if (!["start", "change", "subtotal", "total"].includes(row.kind)) {
+      errors.push(`${row.label || "A bar"} has an unknown waterfall kind.`);
+    }
   });
 }

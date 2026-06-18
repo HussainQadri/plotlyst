@@ -2,6 +2,44 @@ export type ChartType = "pie" | "marimekko" | "waterfall";
 
 export type LabelPlacement = "auto" | "inside" | "outside" | "callout";
 
+export type LabelContentField = "label" | "value" | "percent";
+
+export type LabelSeparator = "space" | "slash" | "newline";
+
+export type NumberScale = "none" | "thousands" | "millions";
+
+export type NegativeStyle = "minus" | "parentheses";
+
+export type NumberFormatSettings = {
+  decimals: number;
+  scale: NumberScale;
+  prefix: string;
+  suffix: string;
+  showPlus: boolean;
+  negativeStyle: NegativeStyle;
+};
+
+export type LabelSettings = {
+  fields: LabelContentField[];
+  separator: LabelSeparator;
+  valueFormat: NumberFormatSettings;
+  percentDecimals: number;
+};
+
+export type WaterfallConnectorStyle = "solid" | "dashed" | "none";
+
+export type WaterfallBuildMode = "buildUp" | "buildDown";
+
+export type WaterfallTotalLabelMode = "calculated" | "amount";
+
+export type WaterfallSettings = {
+  showConnectors: boolean;
+  connectorStyle: WaterfallConnectorStyle;
+  buildMode: WaterfallBuildMode;
+  forceBaseline: boolean;
+  totalLabelMode: WaterfallTotalLabelMode;
+};
+
 export type ChartTheme = {
   id: string;
   name: string;
@@ -22,8 +60,10 @@ export type VisualOverride = {
 
 export type ChartSettings = {
   showLegend: boolean;
-  showValues: boolean;
   showTitle: boolean;
+  showLabels: boolean;
+  labelContent: LabelSettings;
+  waterfall: WaterfallSettings;
 };
 
 export type PieDatum = {
@@ -54,7 +94,7 @@ export type MarimekkoData = {
   columns: MarimekkoColumn[];
 };
 
-export type WaterfallKind = "start" | "change" | "total";
+export type WaterfallKind = "start" | "change" | "subtotal" | "total";
 
 export type WaterfallDatum = {
   id: string;

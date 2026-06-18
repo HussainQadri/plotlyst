@@ -1,11 +1,6 @@
 import { defaultTheme } from "./themes";
-import type { ChartProject, ChartSettings, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
-
-const settings: ChartSettings = {
-  showLegend: true,
-  showValues: true,
-  showTitle: true
-};
+import { defaultChartSettings } from "./labels";
+import type { ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
 
 export const samplePieData: PieData = {
   rows: [
@@ -53,6 +48,7 @@ export const sampleWaterfallData: WaterfallData = {
     { id: "wf-start", label: "2025 Revenue", amount: 128, kind: "start" },
     { id: "wf-new", label: "New Business", amount: 34, kind: "change" },
     { id: "wf-expansion", label: "Expansion", amount: 19, kind: "change" },
+    { id: "wf-subtotal", label: "Gross Revenue", amount: 0, kind: "subtotal" },
     { id: "wf-churn", label: "Churn", amount: -16, kind: "change" },
     { id: "wf-costs", label: "Discounts", amount: -7, kind: "change" },
     { id: "wf-total", label: "2026 Revenue", amount: 0, kind: "total" }
@@ -76,7 +72,7 @@ export function createSampleProject(type: ChartType): ChartProject {
         : type === "marimekko"
           ? structuredClone(sampleMarimekkoData)
           : structuredClone(sampleWaterfallData),
-    settings,
+    settings: defaultChartSettings(type),
     visualOverrides: {}
   };
 }

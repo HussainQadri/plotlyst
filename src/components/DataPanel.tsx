@@ -1,7 +1,10 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Plus, Table2, Trash2 } from "lucide-react";
+import { DatasheetModal } from "./DatasheetModal";
 import { parseDelimited, toNumber } from "@/lib/csv";
+import { isCalculatedWaterfallKind, normalizeWaterfallKind } from "@/lib/datasheet";
 import type {
   ChartProject,
   MarimekkoColumn,
@@ -18,9 +21,19 @@ type DataPanelProps = {
 };
 
 export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps) {
+  const [datasheetOpen, setDatasheetOpen] = useState(false);
+
   return (
     <div className="panel-section data-panel">
-      <div className="section-title">Data</div>
+      <div className="section-title split">
+        <span>
+          <Table2 size={16} />
+          Data
+        </span>
+        <button className="table-icon" type="button" onClick={() => setDatasheetOpen(true)} title="Open datasheet">
+          <Table2 size={15} />
+        </button>
+      </div>
       <p className="hint">{dataSummary(project)}</p>
       {project.type === "pie" && "rows" in project.data ? (
         <PieDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
@@ -30,6 +43,9 @@ export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps
       ) : null}
       {project.type === "waterfall" && "rows" in project.data ? (
         <WaterfallDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
+      ) : null}
+      {datasheetOpen ? (
+        <DatasheetModal project={project} setProject={setProject} setSelectedId={setSelectedId} onClose={() => setDatasheetOpen(false)} />
       ) : null}
     </div>
   );
@@ -346,18 +362,34 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
     setProject((current) => ({
       ...current,
       data: {
-        rows: (current.data as WaterfallData).rows.map((row) =>
-          row.id === id ? { ...row, [field]: field === "amount" ? Number(value) : value } : row
-        )
+        rows: (current.data as WaterfallData).rows.map((row) => {
+          if (row.id !== id) return row;
+          if (field === "amount") return { ...row, amount: Number(value) };
+          if (field === "kind") {
+            const kind = normalizeWaterfallKind(value) ?? "change";
+            return { ...row, kind, amount: isCalculatedWaterfallKind(kind) ? 0 : row.amount };
+          }
+          return { ...row, label: value };
+        })
       }
     }));
   }
 
-  function addRow() {
+  function addRow(kind: WaterfallKind = "change") {
     const id = makeId("wf");
     setProject((current) => ({
       ...current,
-      data: { rows: [...(current.data as WaterfallData).rows, { id, label: "New change", amount: 10, kind: "change" }] }
+      data: {
+        rows: [
+          ...(current.data as WaterfallData).rows,
+          {
+            id,
+            label: kind === "subtotal" ? "Subtotal" : "New change",
+            amount: kind === "subtotal" ? 0 : 10,
+            kind
+          }
+        ]
+      }
     }));
     setSelectedId(id);
   }
@@ -386,7 +418,7 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
           id: makeId(`wf-${index}`),
           label: row[0] || `Bar ${index + 1}`,
           amount: toNumber(row[1] ?? "0"),
-          kind: normalizeKind(row[2]) ?? (index === 0 ? "start" : index === rows.length - 1 ? "total" : "change")
+          kind: normalizeWaterfallKind(row[2]) ?? (index === 0 ? "start" : index === rows.length - 1 ? "total" : "change")
         }))
       },
       visualOverrides: {}
@@ -412,13 +444,20 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
               <input
                 type="number"
                 value={row.amount}
+                disabled={isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"}
                 onFocus={() => setSelectedId(row.id)}
                 onChange={(event) => updateRow(row.id, "amount", event.target.value)}
                 aria-label="Waterfall amount"
+                title={
+                  isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"
+                    ? "Calculated from the running total"
+                    : "Waterfall amount"
+                }
               />
               <select value={row.kind} onFocus={() => setSelectedId(row.id)} onChange={(event) => updateRow(row.id, "kind", event.target.value)} aria-label="Waterfall kind">
                 <option value="start">Start</option>
                 <option value="change">Change</option>
+                <option value="subtotal">Subtotal</option>
                 <option value="total">Total</option>
               </select>
               <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Remove row">
@@ -428,10 +467,16 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
           </div>
         ))}
       </div>
-      <button className="action-button full" type="button" onClick={addRow}>
-        <Plus size={16} />
-        Add bar
-      </button>
+      <div className="button-row">
+        <button className="action-button full" type="button" onClick={() => addRow("change")}>
+          <Plus size={16} />
+          Add bar
+        </button>
+        <button className="action-button ghost full" type="button" onClick={() => addRow("subtotal")}>
+          <Plus size={16} />
+          Subtotal
+        </button>
+      </div>
     </>
   );
 }
@@ -469,13 +514,4 @@ function dataSummary(project: ChartProject): string {
   }
 
   return "Chart data";
-}
-
-function normalizeKind(value: string | undefined): WaterfallKind | null {
-  if (!value) return null;
-  const normalized = value.toLowerCase();
-  if (normalized.startsWith("start")) return "start";
-  if (normalized.startsWith("total")) return "total";
-  if (normalized.startsWith("change")) return "change";
-  return null;
 }

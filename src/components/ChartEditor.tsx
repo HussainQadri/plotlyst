@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
 import { Inspector } from "./Inspector";
+import { layoutWaterfall } from "@/lib/chartMath";
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
@@ -380,10 +381,11 @@ function getSelectableElements(project: ChartProject): SelectableElement[] {
 
   if (project.type === "waterfall") {
     const data = project.data as WaterfallData;
-    return data.rows.map((row) => ({
-      id: row.id,
-      label: row.label,
-      value: row.amount,
+    const bars = layoutWaterfall(data, project.theme.palette, project.visualOverrides, 720, 320, project.settings.waterfall);
+    return bars.map((bar) => ({
+      id: bar.id,
+      label: bar.label,
+      value: bar.displayValue,
       kind: "bar"
     }));
   }
