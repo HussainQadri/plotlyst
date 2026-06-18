@@ -687,12 +687,12 @@ function CanvasToolbar({
           <rect x={10 + index * 24} y="10" width="18" height="22" rx="4" fill={color} stroke="#ffffff" />
         </g>
       ))}
-      <ToolbarText x={112} label="Align" onClick={() => onResetLabelPosition(id)} />
-      <ToolbarText x={154} label="Reset" onClick={() => onResetOverride(id)} />
-      <ToolbarText x={198} label={labelVisible ? "Hide" : "Show"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
-      <ToolbarText x={240} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
-      <ToolbarText x={276} label="+" onClick={() => onAddElement(id)} />
-      <ToolbarText x={296} label="x" onClick={() => onDeleteElement(id)} danger />
+      <ToolbarText x={118} label="Align" onClick={() => onResetLabelPosition(id)} />
+      <ToolbarText x={160} label="Reset" onClick={() => onResetOverride(id)} />
+      <ToolbarText x={206} label={labelVisible ? "Hide" : "Show"} onClick={() => onUpdateOverride(id, { labelVisible: !labelVisible })} />
+      <ToolbarText x={246} label={placementLabel(placement)} onClick={() => onUpdateOverride(id, { labelPlacement: nextPlacement(placement) })} />
+      <ToolbarText x={280} label="+" onClick={() => onAddElement(id)} />
+      <ToolbarText x={298} label="x" onClick={() => onDeleteElement(id)} danger />
     </g>
   );
 }
