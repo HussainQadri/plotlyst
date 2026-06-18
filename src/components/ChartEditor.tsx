@@ -153,9 +153,9 @@ export function ChartEditor() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <div className="brand-mark">B</div>
+          <div className="brand-mark">P</div>
           <div>
-            <p className="eyebrow">BCharts</p>
+            <p className="eyebrow">Plotlyst</p>
             <h1>Business chart editor</h1>
           </div>
         </div>

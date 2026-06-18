@@ -2,7 +2,7 @@ import type { ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } f
 import { normalizeChartSettings } from "./labels";
 import { defaultTheme, themes } from "./themes";
 
-const storageKey = "bcharts.project.v1";
+const storageKey = "plotlyst.project.v1";
 
 export function loadStoredProject(): ChartProject | null {
   if (typeof window === "undefined") return null;
