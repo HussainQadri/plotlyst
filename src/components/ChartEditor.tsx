@@ -1,12 +1,12 @@
 "use client";
 
-import { Download, FileImage, Palette, Redo2, RefreshCcw, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, Download, FileImage, LockKeyhole, Palette, Redo2, RefreshCcw, RotateCcw, Share2, SlidersHorizontal, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
 import { Inspector } from "./Inspector";
 import { layoutWaterfall } from "@/lib/chartMath";
-import { exportDimensions, safeExportName, watermarkText, type ExportBackground, type ExportMode, type ExportScale, type ExportSettings } from "@/lib/export";
+import { decodeExportEntitlementToken, exportDimensions, safeExportName, watermarkText, type ExportBackground, type ExportMode, type ExportScale, type ExportSettings } from "@/lib/export";
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
@@ -26,16 +26,29 @@ const defaultExportSettings: ExportSettings = {
   filename: ""
 };
 
-export function ChartEditor() {
-  const [project, setProject] = useState<ChartProject>(() => createSampleProject("pie"));
+type RailTab = "inspector" | "export" | "issues";
+
+const exportTokenStorageKey = "plotlyst.exportToken.v1";
+
+export function ChartEditor({ initialProject }: { initialProject?: ChartProject }) {
+  const [project, setProject] = useState<ChartProject>(() => initialProject ?? createSampleProject("pie"));
   const [history, setHistory] = useState<{ past: ChartProject[]; future: ChartProject[] }>({ past: [], future: [] });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [exportSettings, setExportSettings] = useState<ExportSettings>(defaultExportSettings);
   const [hydrated, setHydrated] = useState(false);
+  const [activeRailTab, setActiveRailTab] = useState<RailTab>("inspector");
+  const [exportToken, setExportToken] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [shareEnabled, setShareEnabled] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const projectRef = useRef(project);
   const coalescingRef = useRef(false);
   const coalesceTimerRef = useRef<number | null>(null);
+  const checkoutHandledRef = useRef(false);
 
   useEffect(() => {
     projectRef.current = project;
@@ -69,20 +82,33 @@ export function ChartEditor() {
   }, []);
 
   useEffect(() => {
-    const stored = loadStoredProject();
+    const stored = initialProject ? null : loadStoredProject();
     if (stored) {
       // Restoring localStorage is intentionally client-only.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProject(stored);
     }
+    const storedToken = window.localStorage.getItem(exportTokenStorageKey);
+    if (storedToken && decodeExportEntitlementToken(storedToken)) {
+      setExportToken(storedToken);
+    } else {
+      window.localStorage.removeItem(exportTokenStorageKey);
+    }
     setHydrated(true);
-  }, []);
+  }, [initialProject]);
 
   useEffect(() => {
     if (hydrated) {
       saveStoredProject(project);
     }
   }, [hydrated, project]);
+
+  useEffect(() => {
+    fetch("/api/projects/capability")
+      .then((response) => (response.ok ? response.json() as Promise<{ enabled?: boolean }> : { enabled: false }))
+      .then((payload) => setShareEnabled(Boolean(payload.enabled)))
+      .catch(() => setShareEnabled(false));
+  }, []);
 
   const undo = useCallback(() => {
     setHistory((state) => {
@@ -111,6 +137,7 @@ export function ChartEditor() {
   }, []);
 
   const validation = useMemo(() => validateProject(project), [project]);
+  const cleanEntitlement = useMemo(() => (exportToken ? decodeExportEntitlementToken(exportToken) : null), [exportToken]);
 
   const selectableElements = useMemo(() => getSelectableElements(project), [project]);
   const selectedId = selectedIds.at(-1) ?? null;
@@ -118,11 +145,67 @@ export function ChartEditor() {
   const selectedElement = selectableElements.find((element) => element.id === selectedId) ?? null;
   const selectedAnnotation = project.annotations.find((annotation) => annotation.id === selectedId) ?? null;
 
+  const verifyCheckout = useCallback(async (sessionId: string) => {
+    setExportBusy(true);
+    setExportMessage("Verifying checkout...");
+
+    try {
+      const response = await fetch("/api/export/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId })
+      });
+      const payload = (await response.json().catch(() => null)) as { token?: string } | null;
+      if (!response.ok || !payload?.token) {
+        setExportSettings((current) => ({ ...current, mode: "draft" }));
+        setExportMessage("Checkout could not be verified. Draft export remains available.");
+        return;
+      }
+
+      window.localStorage.setItem(exportTokenStorageKey, payload.token);
+      setExportToken(payload.token);
+      setExportSettings((current) => ({ ...current, mode: "clean" }));
+      setExportMessage("Clean export unlocked for 24 hours.");
+    } catch {
+      setExportSettings((current) => ({ ...current, mode: "draft" }));
+      setExportMessage("Checkout verification failed. Draft export remains available.");
+    } finally {
+      setExportBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || checkoutHandledRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const sessionId = params.get("session_id");
+    if (!checkout) return;
+
+    checkoutHandledRef.current = true;
+    window.setTimeout(() => {
+      setActiveRailTab("export");
+
+      if (checkout === "success" && sessionId) {
+        void verifyCheckout(sessionId);
+      } else if (checkout === "cancelled") {
+        setExportSettings((current) => ({ ...current, mode: "draft" }));
+        setExportMessage("Checkout cancelled. Draft export remains available.");
+      }
+    }, 0);
+
+    params.delete("checkout");
+    params.delete("session_id");
+    const nextSearch = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
+  }, [hydrated, verifyCheckout]);
+
   function selectObject(id: string | null, options: { additive?: boolean } = {}) {
     if (!id) {
       setSelectedIds([]);
       return;
     }
+    setActiveRailTab("inspector");
     setSelectedIds((current) => {
       if (!options.additive) return [id];
       if (current.includes(id)) return current.filter((item) => item !== id);
@@ -191,6 +274,7 @@ export function ChartEditor() {
       ]
     }));
     setSelectedIds([id]);
+    setActiveRailTab("inspector");
   }
 
   const updateAnnotation = useCallback((id: string, next: Partial<Annotation>, options?: { coalesce?: boolean }) => {
@@ -273,6 +357,8 @@ export function ChartEditor() {
 
   function updateExportSettings(next: Partial<ExportSettings>) {
     setExportSettings((current) => ({ ...current, ...next }));
+    setActiveRailTab("export");
+    setExportMessage(null);
   }
 
   function serializeSvg(settings = exportSettings): string | null {
@@ -304,13 +390,15 @@ export function ChartEditor() {
     URL.revokeObjectURL(url);
   }
 
-  function exportSvg() {
+  async function exportSvg() {
+    if (!(await canExport())) return;
     const svg = serializeSvg();
     if (!svg) return;
     downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "svg");
   }
 
-  function exportPng() {
+  async function exportPng() {
+    if (!(await canExport())) return;
     const svg = serializeSvg();
     if (!svg) return;
 
@@ -334,6 +422,89 @@ export function ChartEditor() {
       }, "image/png");
     };
     image.src = svgUrl;
+  }
+
+  async function canExport(): Promise<boolean> {
+    if (!validation.valid) {
+      setActiveRailTab("issues");
+      return false;
+    }
+
+    if (exportSettings.mode === "draft") return true;
+
+    setActiveRailTab("export");
+    if (!exportToken || !cleanEntitlement) {
+      setExportMessage("Clean export requires checkout. Draft export is still available.");
+      return false;
+    }
+
+    setExportBusy(true);
+    try {
+      const response = await fetch("/api/export/authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: exportToken })
+      });
+
+      if (response.ok) return true;
+
+      window.localStorage.removeItem(exportTokenStorageKey);
+      setExportToken(null);
+      setExportSettings((current) => ({ ...current, mode: "draft" }));
+      setExportMessage("Clean export expired. Run checkout again to unlock it.");
+      return false;
+    } catch {
+      setExportMessage("Could not authorize clean export. Draft export remains available.");
+      return false;
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function startCheckout() {
+    setActiveRailTab("export");
+    setExportBusy(true);
+    setExportMessage(null);
+
+    try {
+      const response = await fetch("/api/checkout", { method: "POST" });
+      const payload = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+      if (!response.ok || !payload?.url) {
+        setExportMessage(payload?.error ?? "Checkout is not available.");
+        return;
+      }
+      window.location.href = payload.url;
+    } catch {
+      setExportMessage("Checkout could not be started.");
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function shareProject() {
+    setShareBusy(true);
+    setShareMessage(null);
+    setShareUrl(null);
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project })
+      });
+      const payload = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+      if (!response.ok || !payload?.url) {
+        setShareMessage(payload?.error ?? "Share link could not be created.");
+        return;
+      }
+      setShareUrl(payload.url);
+      setShareMessage("Share link created.");
+      await navigator.clipboard?.writeText(payload.url).catch(() => undefined);
+    } catch {
+      setShareMessage("Share link could not be created.");
+    } finally {
+      setShareBusy(false);
+    }
   }
 
   return (
@@ -385,11 +556,17 @@ export function ChartEditor() {
           </div>
 
           <div className="command-group export-group">
-            <button className="action-button ghost" type="button" onClick={exportSvg} disabled={!validation.valid}>
+            {shareEnabled ? (
+              <button className="action-button ghost" type="button" onClick={shareProject} disabled={shareBusy}>
+                <Share2 size={17} />
+                {shareBusy ? "Saving" : "Share"}
+              </button>
+            ) : null}
+            <button className="action-button ghost" type="button" onClick={exportSvg} disabled={exportBusy}>
               <Download size={17} />
               SVG
             </button>
-            <button className="action-button" type="button" onClick={exportPng} disabled={!validation.valid}>
+            <button className="action-button" type="button" onClick={exportPng} disabled={exportBusy}>
               <FileImage size={17} />
               PNG
             </button>
@@ -412,7 +589,14 @@ export function ChartEditor() {
             ))}
           </div>
 
-          <DataPanel project={project} setProject={commitProject} setSelectedId={(id) => setSelectedIds(id ? [id] : [])} />
+          <DataPanel
+            project={project}
+            setProject={commitProject}
+            setSelectedId={(id) => {
+              if (id) setActiveRailTab("inspector");
+              setSelectedIds(id ? [id] : []);
+            }}
+          />
         </aside>
 
         <section className="canvas-zone">
@@ -433,69 +617,106 @@ export function ChartEditor() {
         </section>
 
         <aside className="right-panel">
-          <Inspector
-            project={project}
-            setProject={commitProject}
-            selectedElement={selectedElement}
-            selectedElements={selectedElements}
-            selectedAnnotation={selectedAnnotation}
-            onClearSelection={() => setSelectedIds([])}
-            onAddAnnotation={addAnnotation}
-            onUpdateAnnotation={updateAnnotation}
-            onDeleteAnnotation={deleteAnnotation}
-          />
-
-          <div className="panel-section export-settings-panel">
-            <div className="section-title">
-              <Download size={16} />
+          <div className="rail-tabs" aria-label="Right rail">
+            <button type="button" className={activeRailTab === "inspector" ? "active" : ""} onClick={() => setActiveRailTab("inspector")}>
+              <SlidersHorizontal size={15} />
+              Inspector
+            </button>
+            <button type="button" className={activeRailTab === "export" ? "active" : ""} onClick={() => setActiveRailTab("export")}>
+              <Download size={15} />
               Export
-            </div>
-            <div className="format-grid">
-              <label className="field compact-field">
-                <span>Mode</span>
-                <select value={exportSettings.mode} onChange={(event) => updateExportSettings({ mode: event.target.value as ExportMode })}>
-                  <option value="draft">Draft watermark</option>
-                  <option value="clean">Clean</option>
-                </select>
-              </label>
-              <label className="field compact-field">
-                <span>Scale</span>
-                <select value={exportSettings.scale} onChange={(event) => updateExportSettings({ scale: Number(event.target.value) as ExportScale })}>
-                  <option value={1}>1x - 1920px</option>
-                  <option value={2}>2x - 3840px</option>
-                  <option value={3}>3x - 5760px</option>
-                </select>
-              </label>
-              <label className="field compact-field">
-                <span>Background</span>
-                <select value={exportSettings.background} onChange={(event) => updateExportSettings({ background: event.target.value as ExportBackground })}>
-                  <option value="theme">Theme</option>
-                  <option value="transparent">Transparent</option>
-                </select>
-              </label>
-            </div>
-            <label className="field compact-field">
-              <span>Filename</span>
-              <input value={exportSettings.filename} placeholder={safeExportName(project.title)} onChange={(event) => updateExportSettings({ filename: event.target.value })} />
-            </label>
-            <p className="quiet">{exportSettings.mode === "draft" ? "Draft exports include a small watermark." : "Clean export is available while checkout is not wired."}</p>
+            </button>
+            <button type="button" className={activeRailTab === "issues" ? "active" : ""} onClick={() => setActiveRailTab("issues")}>
+              <AlertTriangle size={15} />
+              Issues
+              {validation.errors.length > 0 ? <span>{validation.errors.length}</span> : null}
+            </button>
           </div>
 
-          <div className="panel-section">
-            <div className="section-title">
-              <RotateCcw size={16} />
-              Validation
+          {activeRailTab === "inspector" ? (
+            <Inspector
+              project={project}
+              setProject={commitProject}
+              selectedElement={selectedElement}
+              selectedElements={selectedElements}
+              selectedAnnotation={selectedAnnotation}
+              onClearSelection={() => setSelectedIds([])}
+              onAddAnnotation={addAnnotation}
+              onUpdateAnnotation={updateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
+            />
+          ) : null}
+
+          {activeRailTab === "export" ? (
+            <div className="panel-section export-settings-panel">
+              <div className="section-title">
+                <Download size={16} />
+                Export
+              </div>
+              <div className="format-grid">
+                <label className="field compact-field">
+                  <span>Mode</span>
+                  <select value={exportSettings.mode} onChange={(event) => updateExportSettings({ mode: event.target.value as ExportMode })}>
+                    <option value="draft">Draft watermark</option>
+                    <option value="clean">Clean</option>
+                  </select>
+                </label>
+                <label className="field compact-field">
+                  <span>Scale</span>
+                  <select value={exportSettings.scale} onChange={(event) => updateExportSettings({ scale: Number(event.target.value) as ExportScale })}>
+                    <option value={1}>1x - 1920px</option>
+                    <option value={2}>2x - 3840px</option>
+                    <option value={3}>3x - 5760px</option>
+                  </select>
+                </label>
+                <label className="field compact-field">
+                  <span>Background</span>
+                  <select value={exportSettings.background} onChange={(event) => updateExportSettings({ background: event.target.value as ExportBackground })}>
+                    <option value="theme">Theme</option>
+                    <option value="transparent">Transparent</option>
+                  </select>
+                </label>
+              </div>
+              <label className="field compact-field">
+                <span>Filename</span>
+                <input value={exportSettings.filename} placeholder={safeExportName(project.title)} onChange={(event) => updateExportSettings({ filename: event.target.value })} />
+              </label>
+              {exportSettings.mode === "clean" && !cleanEntitlement ? (
+                <button className="action-button full" type="button" onClick={startCheckout} disabled={exportBusy}>
+                  <LockKeyhole size={16} />
+                  {exportBusy ? "Starting checkout" : "Unlock clean export"}
+                </button>
+              ) : null}
+              {cleanEntitlement ? <p className="quiet entitlement-note">Clean export unlocked until {new Date(cleanEntitlement.expiresAt).toLocaleString()}.</p> : null}
+              <p className="quiet">{exportSettings.mode === "draft" ? "Draft exports include a small watermark." : "Clean exports require a valid checkout token."}</p>
+              {exportMessage ? <p className="inline-alert">{exportMessage}</p> : null}
+              {shareUrl ? (
+                <p className="share-link">
+                  <span>Share</span>
+                  <a href={shareUrl}>{shareUrl}</a>
+                </p>
+              ) : null}
+              {shareMessage ? <p className="quiet">{shareMessage}</p> : null}
             </div>
-            {validation.errors.length === 0 ? (
-              <p className="quiet">Chart is ready to export.</p>
-            ) : (
-              <ul className="error-list">
-                {validation.errors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            )}
-          </div>
+          ) : null}
+
+          {activeRailTab === "issues" ? (
+            <div className="panel-section">
+              <div className="section-title">
+                <RotateCcw size={16} />
+                Issues
+              </div>
+              {validation.errors.length === 0 ? (
+                <p className="quiet">Chart is ready to export.</p>
+              ) : (
+                <ul className="error-list">
+                  {validation.errors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </aside>
       </section>
     </main>
