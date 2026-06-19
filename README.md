@@ -23,8 +23,9 @@ It is built for the charts that usually end up in strategy decks, board updates,
 - Label formatting, placement, dragging, and reset controls
 - Per-mark color and visibility overrides
 - Waterfall starts, changes, subtotals, totals, and connectors
-- SVG-first rendering with clean SVG/PNG export
+- SVG-first rendering with watermarked draft export and paid clean SVG/PNG export
 - Local browser persistence through `localStorage`
+- Anonymous share links when KV storage is configured
 
 ## Try It
 
@@ -34,7 +35,7 @@ Use the hosted version:
 https://plotlyst-eight.vercel.app/
 ```
 
-Projects are currently saved in your browser only. There are no accounts or cloud saves yet.
+Projects are saved in your browser by default. Anonymous share links are available only when server-side KV storage is configured.
 
 ## Run Locally
 
@@ -47,6 +48,17 @@ Then open:
 
 ```text
 http://localhost:3000
+```
+
+Optional paid export and sharing variables:
+
+```bash
+STRIPE_SECRET_KEY=
+STRIPE_PRICE_ID=
+EXPORT_TOKEN_SECRET=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+KV_REST_API_URL=
+KV_REST_API_TOKEN=
 ```
 
 ## Build Checks
@@ -79,6 +91,8 @@ src/lib/chartMath.ts                chart layout math
 src/lib/datasheet.ts                paste parsing
 src/lib/labels.ts                   label and number formatting
 src/lib/storage.ts                  browser persistence
+src/lib/projects.ts                 anonymous project share envelopes
+src/lib/exportToken.ts              signed clean-export entitlement tokens
 src/lib/types.ts                    core chart types
 ```
 
