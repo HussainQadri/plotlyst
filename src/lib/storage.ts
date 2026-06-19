@@ -33,7 +33,7 @@ export function isWaterfallData(type: ChartType, data: unknown): data is Waterfa
   return type === "waterfall" && typeof data === "object" && data !== null && "rows" in data;
 }
 
-function normalizeStoredProject(raw: unknown): ChartProject | null {
+export function normalizeStoredProject(raw: unknown): ChartProject | null {
   if (!isRecord(raw)) return null;
   const type = raw.type;
   if (type !== "pie" && type !== "marimekko" && type !== "waterfall") return null;
