@@ -35,7 +35,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# local Codex/runtime metadata
+# local workspace metadata
 .agents/
 .codex/
-
+.interface-design/
+ROADMAP.md
