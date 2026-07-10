@@ -655,7 +655,9 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
   return (
     <button className="toggle-row" type="button" onClick={onChange} aria-pressed={checked}>
       <span>{label}</span>
-      <span className={checked ? "toggle-pill on" : "toggle-pill"}>{checked ? "On" : "Off"}</span>
+      <span className={checked ? "toggle-pill on" : "toggle-pill"} aria-hidden="true">
+        <span />
+      </span>
     </button>
   );
 }

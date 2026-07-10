@@ -1,6 +1,23 @@
 "use client";
 
-import { AlertTriangle, Download, FileImage, LockKeyhole, Palette, Redo2, RefreshCcw, RotateCcw, Share2, SlidersHorizontal, Undo2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ChartNoAxesColumnIncreasing,
+  ChartPie,
+  Columns3,
+  Download,
+  FileImage,
+  LockKeyhole,
+  Palette,
+  Presentation,
+  Redo2,
+  RefreshCcw,
+  RotateCcw,
+  Share2,
+  SlidersHorizontal,
+  Undo2,
+  type LucideIcon
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
@@ -13,10 +30,10 @@ import { themes } from "@/lib/themes";
 import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
 import { validateProject } from "@/lib/validation";
 
-const chartTypes: Array<{ id: ChartType; label: string }> = [
-  { id: "pie", label: "Pie" },
-  { id: "marimekko", label: "Marimekko" },
-  { id: "waterfall", label: "Waterfall" }
+const chartTypes: Array<{ id: ChartType; label: string; description: string; icon: LucideIcon }> = [
+  { id: "pie", label: "Pie", description: "Composition", icon: ChartPie },
+  { id: "marimekko", label: "Marimekko", description: "Market map", icon: Columns3 },
+  { id: "waterfall", label: "Waterfall", description: "Variance bridge", icon: ChartNoAxesColumnIncreasing }
 ];
 
 const defaultExportSettings: ExportSettings = {
@@ -511,21 +528,23 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <div className="brand-mark">P</div>
+          <div className="brand-mark" aria-hidden="true">
+            <Presentation size={20} />
+          </div>
           <div>
             <p className="eyebrow">Plotlyst</p>
-            <h1>Business chart editor</h1>
+            <h1>Chart studio</h1>
           </div>
         </div>
 
         <div className="toolbar">
           <div className="command-group document-fields">
-            <label className="field compact">
-              <span>Title</span>
+            <label className="field compact document-title-field">
+              <span>Document</span>
               <input value={project.title} onChange={(event) => updateTitle(event.target.value)} />
             </label>
 
-            <label className="field compact">
+            <label className="field compact theme-field">
               <span>Theme</span>
               <select value={project.theme.id} onChange={(event) => updateTheme(event.target.value)}>
                 {themes.map((theme) => (
@@ -576,17 +595,32 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
       <section className="workspace">
         <aside className="left-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Build</p>
+              <h2>Chart structure</h2>
+            </div>
+            <span className="panel-kicker">01</span>
+          </div>
+
           <div className="segmented" aria-label="Chart type">
-            {chartTypes.map((chart) => (
-              <button
-                key={chart.id}
-                type="button"
-                className={project.type === chart.id ? "active" : ""}
-                onClick={() => switchChartType(chart.id)}
-              >
-                {chart.label}
-              </button>
-            ))}
+            {chartTypes.map((chart) => {
+              const Icon = chart.icon;
+              return (
+                <button
+                  key={chart.id}
+                  type="button"
+                  className={project.type === chart.id ? "active" : ""}
+                  onClick={() => switchChartType(chart.id)}
+                >
+                  <Icon size={17} />
+                  <span className="chart-tab-copy">
+                    <strong>{chart.label}</strong>
+                    <small>{chart.description}</small>
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <DataPanel
@@ -600,23 +634,46 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
         </aside>
 
         <section className="canvas-zone">
-          <ChartCanvas
-            ref={svgRef}
-            project={project}
-            selectedId={selectedId}
-            selectedIds={selectedIds}
-            onSelect={selectObject}
-            onUpdateOverride={updateVisualOverride}
-            onResetOverride={resetVisualOverride}
-            onAddElement={addElementAfter}
-            onDeleteElement={deleteElement}
-            onUpdateAnnotation={updateAnnotation}
-            onDeleteAnnotation={deleteAnnotation}
-            validation={validation}
-          />
+          <div className="stage-header">
+            <div className="stage-title">
+              <Presentation size={15} />
+              <strong>Slide 01</strong>
+              <span>{project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}</span>
+            </div>
+            <div className="stage-spec" aria-label="Slide dimensions">
+              <span>16:9</span>
+              <span>960 x 540</span>
+            </div>
+          </div>
+          <div className="canvas-workbench">
+            <ChartCanvas
+              ref={svgRef}
+              project={project}
+              selectedId={selectedId}
+              selectedIds={selectedIds}
+              onSelect={selectObject}
+              onUpdateOverride={updateVisualOverride}
+              onResetOverride={resetVisualOverride}
+              onAddElement={addElementAfter}
+              onDeleteElement={deleteElement}
+              onUpdateAnnotation={updateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
+              validation={validation}
+            />
+          </div>
         </section>
 
         <aside className="right-panel">
+          <div className="panel-heading rail-heading">
+            <div>
+              <p className="eyebrow">Format</p>
+              <h2>Properties</h2>
+            </div>
+            <span className="selection-indicator">
+              {selectedIds.length > 0 ? `${selectedIds.length} selected` : "Chart"}
+            </span>
+          </div>
+
           <div className="rail-tabs" aria-label="Right rail">
             <button type="button" className={activeRailTab === "inspector" ? "active" : ""} onClick={() => setActiveRailTab("inspector")}>
               <SlidersHorizontal size={15} />
