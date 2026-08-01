@@ -1,0 +1,52 @@
+/* Editor-only canvas affordances.
+ *
+ * Artifact typography lives in src/lib/chartStyles.ts and is injected into the
+ * SVG itself so it survives export. Only interaction state belongs here: these
+ * rules must never be required for the exported chart to look correct.
+ */
+
+.selectable-mark {
+  cursor: pointer;
+  transition:
+    opacity var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
+}
+
+.selectable-mark:hover {
+  filter: saturate(1.08);
+  opacity: 0.9;
+}
+
+.label-handle,
+.annotation-label {
+  cursor: grab;
+  user-select: none;
+}
+
+.label-handle:active,
+.annotation-label:active {
+  cursor: grabbing;
+}
+
+.label-handle.selected,
+.annotation-object.selected .annotation-label {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.annotation-object {
+  cursor: pointer;
+}
+
+.canvas-toolbar {
+  filter: drop-shadow(0 6px 16px rgba(17, 26, 24, 0.22));
+}
+
+.toolbar-hit {
+  cursor: pointer;
+}
+
+.toolbar-hit:hover text {
+  fill: var(--accent-quiet);
+}

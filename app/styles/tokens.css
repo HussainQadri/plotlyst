@@ -1,0 +1,171 @@
+/*
+ * Plotlyst design tokens.
+ *
+ * Single source of truth for surface, text, line, accent, spacing, radius, type
+ * and motion values. Component stylesheets may only consume these variables;
+ * they must not introduce raw hex colours.
+ *
+ * Light is the default. Dark is opt-in through [data-theme="dark"] on <html>,
+ * which app/layout.tsx sets before first paint.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces, ordered back to front. */
+  --bg-app: #eceeed;
+  --bg-panel: #f6f7f7;
+  --bg-raised: #ffffff;
+  --bg-inset: #ffffff;
+  --bg-hover: rgba(19, 28, 27, 0.045);
+  --bg-active: rgba(19, 28, 27, 0.075);
+  --bg-slide: #ffffff;
+  --bg-scrim: rgba(15, 22, 21, 0.55);
+
+  /* Text hierarchy. */
+  --fg: #131c1b;
+  --fg-secondary: #3d4a47;
+  --fg-muted: #66716e;
+  --fg-faint: #949d9a;
+  --fg-on-accent: #ffffff;
+
+  /* Lines. Borders and surface shifts carry the chrome; shadow is reserved. */
+  --line-soft: rgba(19, 28, 27, 0.07);
+  --line: rgba(19, 28, 27, 0.13);
+  --line-strong: rgba(19, 28, 27, 0.26);
+
+  /* Teal is the single selection and primary-action colour. */
+  --accent: #0f7f6d;
+  --accent-hover: #0c6c5c;
+  --accent-quiet: #095d50;
+  --accent-soft: rgba(15, 127, 109, 0.09);
+  --accent-soft-hover: rgba(15, 127, 109, 0.15);
+  --accent-line: rgba(15, 127, 109, 0.28);
+
+  /* Business variance semantics. */
+  --positive: #2f7d57;
+  --positive-soft: rgba(47, 125, 87, 0.11);
+  --negative: #c64a40;
+  --negative-soft: rgba(198, 74, 64, 0.11);
+  --warning: #96590d;
+  --warning-soft: rgba(150, 89, 13, 0.1);
+  --warning-line: rgba(150, 89, 13, 0.26);
+  --danger: #ad3730;
+  --danger-soft: rgba(173, 55, 48, 0.1);
+
+  --focus-ring: rgba(15, 127, 109, 0.42);
+
+  /* Only the slide artifact gets meaningful elevation. */
+  --shadow-slide: 0 18px 44px rgba(17, 26, 24, 0.14), 0 2px 6px rgba(17, 26, 24, 0.07);
+  --shadow-popover: 0 16px 40px rgba(17, 26, 24, 0.18), 0 1px 2px rgba(17, 26, 24, 0.1);
+  --shadow-dialog: 0 28px 72px rgba(17, 26, 24, 0.26);
+  --shadow-raised: 0 1px 2px rgba(17, 26, 24, 0.07);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-app: #0e1211;
+  --bg-panel: #161b1a;
+  --bg-raised: #1e2523;
+  --bg-inset: #111615;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.085);
+  --bg-slide: #ffffff;
+  --bg-scrim: rgba(4, 7, 7, 0.7);
+
+  --fg: #e7ecea;
+  --fg-secondary: #b6c0bd;
+  --fg-muted: #8b9793;
+  --fg-faint: #6a7572;
+  --fg-on-accent: #04120f;
+
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.24);
+
+  --accent: #2fb79c;
+  --accent-hover: #45c9ae;
+  --accent-quiet: #7fdcc7;
+  --accent-soft: rgba(47, 183, 156, 0.13);
+  --accent-soft-hover: rgba(47, 183, 156, 0.2);
+  --accent-line: rgba(47, 183, 156, 0.34);
+
+  --positive: #67c194;
+  --positive-soft: rgba(103, 193, 148, 0.14);
+  --negative: #e58279;
+  --negative-soft: rgba(229, 130, 121, 0.14);
+  --warning: #dfae67;
+  --warning-soft: rgba(223, 174, 103, 0.13);
+  --warning-line: rgba(223, 174, 103, 0.28);
+  --danger: #e5837a;
+  --danger-soft: rgba(229, 131, 122, 0.13);
+
+  --focus-ring: rgba(47, 183, 156, 0.5);
+
+  --shadow-slide: 0 22px 52px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-dialog: 0 28px 72px rgba(0, 0, 0, 0.66);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:root {
+  /* Inter ships from next/font in app/layout.tsx as --font-inter. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Spacing. 4px base, 8px rhythm. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* Radii stay small: this is a technical editing surface. */
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --r-pill: 999px;
+
+  /* Type scale. */
+  --fs-micro: 10px;
+  --fs-label: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 19px;
+
+  /* Real weights only. The previous 760-850 values had no matching face. */
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --tracking-label: 0.06em;
+
+  /* Chrome metrics, shared by the shell and its resize logic. */
+  --topbar-h: 48px;
+  --stage-header-h: 38px;
+  --icon-rail-w: 52px;
+  --control-h: 30px;
+  --control-h-sm: 26px;
+
+  /* Panel widths are overwritten inline by the resize handles. */
+  --data-panel-w: 320px;
+  --inspector-w: 308px;
+
+  --dur-fast: 90ms;
+  --dur: 140ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+}
