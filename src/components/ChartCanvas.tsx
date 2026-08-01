@@ -3,6 +3,7 @@
 import { forwardRef, useRef, useState } from "react";
 import { AlignCenterHorizontal, Eye, EyeOff, MapPin, Plus, RotateCcw, Trash2, type LucideIcon } from "lucide-react";
 import { resolveAnnotations } from "@/lib/annotations";
+import { chartArtifactCss, chartStyleMarker } from "@/lib/chartStyles";
 import {
   describeArc,
   layoutMarimekko,
@@ -119,11 +120,16 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
         role="img"
         aria-label={project.title}
         className="chart-svg"
+        // --halo drives the text outline colour so labels stay legible on any
+        // slide background instead of assuming warm paper.
+        style={{ ["--halo" as string]: project.theme.background }}
         onClick={() => onSelect(null)}
         onPointerMove={moveLabel}
         onPointerUp={() => setDrag(null)}
         onPointerCancel={() => setDrag(null)}
       >
+        {/* Artifact typography lives inside the SVG so it survives export. */}
+        <style {...{ [chartStyleMarker]: "true" }} dangerouslySetInnerHTML={{ __html: chartArtifactCss }} />
         <rect width="960" height="540" fill={project.theme.background} />
         {project.settings.showTitle ? (
           <text x="64" y="62" className="svg-title" fill={project.theme.foreground}>
@@ -184,7 +190,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
         />
 
         {!validation.valid ? (
-          <g>
+          <g data-export-hidden="true">
             <rect x="64" y="478" width="832" height="34" rx="8" fill="#fff8e1" stroke="#e4b653" />
             <text x="82" y="500" className="svg-note" fill="#6f5200">
               Fix validation issues to export this chart.

@@ -1,0 +1,628 @@
+/* Application shell: command bar, chart-type rail, resizable side panels,
+   and the slide stage. The slide is the artifact; everything else is chrome. */
+
+.app-shell {
+  display: grid;
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+/* ---------- Command bar ---------- */
+
+.topbar {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-panel);
+  padding: 0 10px 0 var(--sp-3);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+}
+
+.brand-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+
+.brand-wordmark {
+  color: var(--fg);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+
+/* Document title reads as text until hovered or focused. */
+.topbar-doc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Sized rather than stretched: a full-width input would leave a dead gap
+   between the title and the theme picker beside it. */
+.doc-title-input {
+  width: 264px;
+  max-width: 38vw;
+  min-width: 0;
+  flex: 0 1 auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+}
+
+.doc-title-input:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--bg-inset);
+}
+
+.doc-title-input:focus {
+  border-color: var(--accent-line);
+  background: var(--bg-inset);
+}
+
+.doc-theme-select {
+  width: 128px;
+  min-height: 26px;
+  flex: 0 0 auto;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--fg-muted);
+  font-size: var(--fs-label);
+}
+
+.doc-theme-select:hover:not(:disabled) {
+  border-color: var(--line);
+  background-color: var(--bg-inset);
+  color: var(--fg);
+}
+
+.doc-meta {
+  flex: 0 0 auto;
+  color: var(--fg-faint);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.bar-divider {
+  width: 1px;
+  height: 20px;
+  flex: 0 0 auto;
+  background: var(--line);
+  margin: 0 4px;
+}
+
+.topbar .icon-button,
+.topbar .action-button {
+  min-height: 28px;
+}
+
+.topbar .icon-button {
+  width: 28px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.topbar .icon-button:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--bg-hover);
+}
+
+.palette-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  padding: 0 6px 0 8px;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.palette-trigger:hover {
+  border-color: var(--line-strong);
+  color: var(--fg);
+}
+
+/* ---------- Workspace ---------- */
+
+.workspace {
+  display: grid;
+  grid-template-columns:
+    var(--icon-rail-w)
+    var(--data-panel-w)
+    minmax(0, 1fr)
+    var(--inspector-w);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Every region is placed explicitly. A collapsed panel is display:none, and
+   with auto-placement that would slide every later region one column left --
+   which silently swallowed the stage. */
+.icon-rail {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.data-panel-host {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.stage {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.inspector-host {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.app-shell[data-left-collapsed="true"] .workspace {
+  --data-panel-w: 0px;
+}
+
+.app-shell[data-right-collapsed="true"] .workspace {
+  --inspector-w: 0px;
+}
+
+.app-shell[data-left-collapsed="true"] .data-panel-host,
+.app-shell[data-right-collapsed="true"] .inspector-host {
+  display: none;
+}
+
+/* ---------- Chart-type rail ---------- */
+
+.icon-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-panel);
+  padding: var(--sp-2) 0;
+}
+
+.icon-rail-spacer {
+  flex: 1 1 auto;
+}
+
+.rail-button {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-muted);
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.rail-button:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.rail-button[aria-pressed="true"],
+.rail-button[aria-current="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.rail-divider {
+  width: 22px;
+  height: 1px;
+  flex: 0 0 auto;
+  background: var(--line);
+  margin: var(--sp-1) 0;
+}
+
+/* Hover tooltips, so icon-only controls stay discoverable. */
+.has-tip {
+  position: relative;
+}
+
+.has-tip::after {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  z-index: 40;
+  border-radius: var(--r-sm);
+  background: var(--fg);
+  color: var(--bg-panel);
+  content: attr(data-tip);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  opacity: 0;
+  padding: 3px 7px;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity var(--dur) var(--ease);
+  white-space: nowrap;
+}
+
+.has-tip:hover::after,
+.has-tip:focus-visible::after {
+  opacity: 1;
+}
+
+.has-tip.tip-below::after {
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.has-tip.tip-below-end::after {
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+/* ---------- Side panels ---------- */
+
+.side-panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-panel);
+}
+
+.data-panel-host {
+  border-right: 1px solid var(--line);
+}
+
+.inspector-host {
+  border-left: 1px solid var(--line);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: var(--stage-header-h);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 0 var(--sp-2) 0 var(--sp-3);
+}
+
+.panel-head h2 {
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-head-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3);
+}
+
+.panel-collapse {
+  width: 22px;
+  min-height: 22px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-faint);
+}
+
+.panel-collapse:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* Drag edge. Wide hit area, hairline highlight. */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 9px;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  padding: 0;
+}
+
+.data-panel-host .resize-handle {
+  right: -5px;
+}
+
+.inspector-host .resize-handle {
+  left: -5px;
+}
+
+.resize-handle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background var(--dur) var(--ease);
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+.resize-handle[data-dragging="true"]::after {
+  background: var(--accent);
+}
+
+.app-shell[data-resizing="true"] {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* ---------- Stage ---------- */
+
+.stage {
+  display: grid;
+  grid-template-rows: var(--stage-header-h) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-width: 0;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 0 var(--sp-2);
+}
+
+.stage-header-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stage-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-label strong {
+  color: var(--fg-secondary);
+  font-weight: var(--fw-medium);
+}
+
+.stage-label .dot {
+  color: var(--fg-faint);
+}
+
+.zoom-cluster {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+.zoom-cluster .icon-button {
+  width: 24px;
+  min-height: 24px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.zoom-cluster .icon-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.zoom-value {
+  min-width: 46px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--fg-secondary);
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+  padding: 3px 4px;
+  text-align: center;
+}
+
+.zoom-value:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* Flex + `margin: auto` rather than grid centering: a zoomed slide wider than
+   the stage must stay scrollable in both directions, which centred grid tracks
+   clip. */
+.stage-scroll {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-6) clamp(var(--sp-4), 3vw, var(--sp-8));
+}
+
+.slide-frame {
+  width: var(--slide-w, 100%);
+  max-width: var(--slide-max, 1120px);
+  aspect-ratio: 16 / 9;
+  flex: 0 0 auto;
+  margin: auto;
+  border: 1px solid var(--line);
+  background: var(--bg-slide);
+  box-shadow: var(--shadow-slide);
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Narrow viewports ---------- */
+
+@media (max-width: 1240px) {
+  .palette-trigger,
+  .doc-meta {
+    display: none;
+  }
+}
+
+/* The inspector drops below the stage once three columns stop fitting. */
+@media (max-width: 1080px) {
+  /* Row 2 needs a definite height. An `auto` track would take its size from the
+     inspector's full content and starve the stage to zero. */
+  .workspace {
+    grid-template-columns: var(--icon-rail-w) var(--data-panel-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 316px;
+  }
+
+  .icon-rail {
+    grid-row: 1 / -1;
+  }
+
+  .inspector-host {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-height: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .inspector-host .resize-handle {
+    display: none;
+  }
+
+  /* Keep label/control pairs readable instead of stretching them the full
+     width of the docked inspector. */
+  .inspector-host .rail-body > * {
+    max-width: 440px;
+  }
+}
+
+@media (max-width: 820px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .topbar-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+
+  /* Single content column: stage first, then both panels stacked. */
+  .workspace {
+    grid-template-columns: var(--icon-rail-w) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .icon-rail {
+    grid-row: 1 / -1;
+  }
+
+  .stage {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 60vh;
+  }
+
+  .data-panel-host {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 420px;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .data-panel-host .resize-handle {
+    display: none;
+  }
+
+  .inspector-host {
+    grid-column: 2;
+    grid-row: 3;
+    min-height: 420px;
+  }
+
+  .doc-title-input {
+    max-width: none;
+  }
+}

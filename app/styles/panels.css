@@ -1,0 +1,386 @@
+/* Panel contents: sections, data editors, inspector blocks.
+   Panels are flat instruments. No nested cards, no elevation. */
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  color: var(--fg-secondary);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.section-title.split {
+  justify-content: space-between;
+}
+
+.section-title.split > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.section-title svg {
+  color: var(--fg-faint);
+}
+
+.settings-block {
+  display: grid;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--sp-3);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+/* ---------- Data table (pie) ---------- */
+
+.data-table {
+  width: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  background: var(--bg-raised);
+  table-layout: fixed;
+}
+
+.data-table th {
+  height: 24px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg-panel);
+  color: var(--fg-faint);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  padding: 0 6px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  border-top: 1px solid var(--line-soft);
+  padding: 3px 4px;
+  vertical-align: middle;
+}
+
+.data-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+.data-table input,
+.data-table select {
+  min-height: 26px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.data-table input:focus,
+.data-table select:focus {
+  border-color: var(--accent-line);
+  background: var(--bg-inset);
+}
+
+.data-table .value-col {
+  width: 84px;
+}
+
+.data-table .action-col {
+  width: 34px;
+}
+
+.data-table tr.has-override td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ---------- Row cards (waterfall) ---------- */
+
+.row-card-list {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.data-row-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  padding: 6px;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.data-row-card:hover,
+.data-row-card:focus-within {
+  border-color: var(--line-strong);
+}
+
+.data-row-card.has-override {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.row-card-head {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.row-card-head > span {
+  color: var(--fg-faint);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+
+.row-card-controls {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.9fr) minmax(80px, 1fr) var(--control-h-sm);
+  align-items: center;
+  gap: 6px;
+  padding-left: 26px;
+}
+
+.row-card-controls input,
+.row-card-controls select {
+  min-height: 26px;
+}
+
+/* ---------- Marimekko column cards ---------- */
+
+.mekko-manager {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.mekko-card {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+}
+
+.mekko-card summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 8px;
+}
+
+.mekko-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.mekko-card summary:hover {
+  background: var(--bg-hover);
+}
+
+.mekko-card summary > span {
+  color: var(--fg-faint);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.mekko-card summary strong {
+  min-width: 0;
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mekko-column-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--control-h-sm);
+  align-items: end;
+  gap: 6px;
+  border-top: 1px solid var(--line-soft);
+  padding: var(--sp-2) 8px;
+}
+
+.mekko-segments {
+  display: grid;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+
+.mekko-segment-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 62px var(--control-h-sm);
+  align-items: center;
+  gap: 5px;
+}
+
+.mekko-segment-row input {
+  min-height: 26px;
+}
+
+.color-swatch {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--r-xs);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  padding: 0;
+  transition: box-shadow var(--dur) var(--ease);
+}
+
+.color-swatch:hover {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.segment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.segment-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  font-size: var(--fs-micro);
+  overflow: hidden;
+  padding: 2px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segment-strip button:hover {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 calc(-1 * var(--sp-3));
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-panel);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* ---------- Inspector ---------- */
+
+.selected-summary {
+  display: grid;
+  gap: 3px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding: 7px 9px 7px 11px;
+}
+
+.selected-summary .breadcrumb {
+  color: var(--fg-muted);
+  font-size: var(--fs-micro);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-summary strong {
+  color: var(--fg);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+
+.selected-summary .metric {
+  color: var(--fg-secondary);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.selection-note {
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--sp-3);
+}
+
+.rail-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.rail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3);
+}
+
+/* ---------- Export panel ---------- */
+
+.share-link {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--sp-2);
+}
+
+.share-link > span {
+  color: var(--fg-faint);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.share-link a {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+}
+
+.empty-state .status-chip {
+  padding-left: 0;
+}

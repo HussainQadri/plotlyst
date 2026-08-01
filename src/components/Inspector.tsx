@@ -175,22 +175,24 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
     }
 
     return (
-      <div className="panel-section inspector">
+      <div className="panel-section">
         <div className="section-title split">
           <span>
-            <MousePointer2 size={16} />
+            <MousePointer2 size={13} aria-hidden="true" />
             Bulk edit
           </span>
-          <button className="table-icon" type="button" onClick={onClearSelection} title="Clear selection">
-            <X size={15} />
+          <button className="table-icon" type="button" onClick={onClearSelection} aria-label="Clear selection" title="Clear selection">
+            <X size={13} aria-hidden="true" />
           </button>
         </div>
 
         <div className="selected-summary">
-          <small>Chart / {project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}</small>
+          <span className="breadcrumb">
+            Chart / {project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}
+          </span>
           <span className="pill">{selectedElements.length} marks</span>
           <strong>{selectedElements.map((element) => element.label).join(", ")}</strong>
-          <small>Bulk color, label visibility, and placement</small>
+          <span className="metric">Bulk colour, label visibility and placement</span>
         </div>
 
         <label className="field">
@@ -210,11 +212,11 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
         </label>
 
         <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelVisible: false })}>
-          <EyeOff size={16} />
+          <EyeOff size={14} aria-hidden="true" />
           Hide labels
         </button>
         <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelVisible: true })}>
-          <Eye size={16} />
+          <Eye size={14} aria-hidden="true" />
           Show labels
         </button>
         <button className="action-button ghost full" type="button" onClick={() => updateBulk({ labelOffset: undefined })}>
@@ -242,22 +244,22 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
     }
 
     return (
-      <div className="panel-section inspector">
+      <div className="panel-section">
         <div className="section-title split">
           <span>
-            <MousePointer2 size={16} />
+            <MousePointer2 size={13} aria-hidden="true" />
             Annotation
           </span>
-          <button className="table-icon" type="button" onClick={onClearSelection} title="Clear selection">
-            <X size={15} />
+          <button className="table-icon" type="button" onClick={onClearSelection} aria-label="Clear selection" title="Clear selection">
+            <X size={13} aria-hidden="true" />
           </button>
         </div>
 
         <div className="selected-summary">
-          <small>{annotationBreadcrumb(project)}</small>
+          <span className="breadcrumb">{annotationBreadcrumb(project)}</span>
           <span className="pill">{annotation.type}</span>
           <strong>{annotation.label || "Annotation"}</strong>
-          <small>Anchored to {annotation.anchorIds[0]}</small>
+          <span className="metric">Anchored to {annotation.anchorIds[0]}</span>
         </div>
 
         <label className="field">
@@ -271,7 +273,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
         </label>
 
         <button className="action-button ghost full" type="button" onClick={() => updateAnnotation({ visible: !annotation.visible })}>
-          {annotation.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+          {annotation.visible ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
           {annotation.visible ? "Hide annotation" : "Show annotation"}
         </button>
 
@@ -295,9 +297,9 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
     const valueFormat = labelContent.valueFormat;
 
     return (
-      <div className="panel-section chart-settings">
+      <div className="panel-section">
         <div className="section-title">
-          <Settings2 size={16} />
+          <Settings2 size={13} aria-hidden="true" />
           Chart settings
         </div>
         <ToggleRow
@@ -328,7 +330,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
               />
             ))}
           </div>
-          <label className="field compact-field">
+          <label className="field">
             <span>Separator</span>
             <select
               value={labelContent.separator}
@@ -345,8 +347,8 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
 
         <div className="settings-block">
           <div className="subsection-label">Number format</div>
-          <div className="format-grid">
-            <label className="field compact-field">
+          <div className="field-grid">
+            <label className="field">
               <span>Decimals</span>
               <input
                 type="number"
@@ -356,7 +358,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                 onChange={(event) => updateValueFormat({ decimals: Number(event.target.value) })}
               />
             </label>
-            <label className="field compact-field">
+            <label className="field">
               <span>Scale</span>
               <select value={valueFormat.scale} onChange={(event) => updateValueFormat({ scale: event.target.value as NumberScale })}>
                 {scales.map((scale) => (
@@ -366,15 +368,15 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                 ))}
               </select>
             </label>
-            <label className="field compact-field">
+            <label className="field">
               <span>Prefix</span>
               <input value={valueFormat.prefix} onChange={(event) => updateValueFormat({ prefix: event.target.value })} />
             </label>
-            <label className="field compact-field">
+            <label className="field">
               <span>Suffix</span>
               <input value={valueFormat.suffix} onChange={(event) => updateValueFormat({ suffix: event.target.value })} />
             </label>
-            <label className="field compact-field">
+            <label className="field">
               <span>Percent dp</span>
               <input
                 type="number"
@@ -384,7 +386,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                 onChange={(event) => updateLabelContent({ percentDecimals: Number(event.target.value) })}
               />
             </label>
-            <label className="field compact-field">
+            <label className="field">
               <span>Negative</span>
               <select
                 value={valueFormat.negativeStyle}
@@ -409,8 +411,8 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
               checked={project.settings.waterfall.showConnectors}
               onChange={() => updateWaterfallSettings({ showConnectors: !project.settings.waterfall.showConnectors })}
             />
-            <div className="format-grid">
-              <label className="field compact-field">
+            <div className="field-grid">
+              <label className="field">
                 <span>Connector</span>
                 <select
                   value={project.settings.waterfall.connectorStyle}
@@ -423,7 +425,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                   ))}
                 </select>
               </label>
-              <label className="field compact-field">
+              <label className="field">
                 <span>Direction</span>
                 <select
                   value={project.settings.waterfall.buildMode}
@@ -436,7 +438,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                   ))}
                 </select>
               </label>
-              <label className="field compact-field">
+              <label className="field">
                 <span>Total labels</span>
                 <select
                   value={project.settings.waterfall.totalLabelMode}
@@ -461,8 +463,8 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
         {project.type === "marimekko" ? (
           <div className="settings-block">
             <div className="subsection-label">Mekko</div>
-            <div className="format-grid">
-              <label className="field compact-field">
+            <div className="field-grid">
+              <label className="field">
                 <span>Mode</span>
                 <select value={project.settings.mekko.mode} onChange={(event) => updateMekkoSettings({ mode: event.target.value as MekkoMode })}>
                   {mekkoModes.map((mode) => (
@@ -472,7 +474,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                   ))}
                 </select>
               </label>
-              <label className="field compact-field">
+              <label className="field">
                 <span>Order</span>
                 <select value={project.settings.mekko.segmentOrder} onChange={(event) => updateMekkoSettings({ segmentOrder: event.target.value as MekkoSegmentOrder })}>
                   {mekkoOrders.map((order) => (
@@ -482,7 +484,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                   ))}
                 </select>
               </label>
-              <label className="field compact-field">
+              <label className="field">
                 <span>Other below</span>
                 <input
                   type="number"
@@ -559,22 +561,22 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
   }
 
   return (
-    <div className="panel-section inspector">
+    <div className="panel-section">
       <div className="section-title split">
         <span>
-          <MousePointer2 size={16} />
+          <MousePointer2 size={13} aria-hidden="true" />
           Visual edit
         </span>
-        <button className="table-icon" type="button" onClick={onClearSelection} title="Clear selection">
-          <X size={15} />
+        <button className="table-icon" type="button" onClick={onClearSelection} aria-label="Clear selection" title="Clear selection">
+          <X size={13} aria-hidden="true" />
         </button>
       </div>
 
       <div className="selected-summary">
-        <small>{elementBreadcrumb(project, selectedElement)}</small>
+        <span className="breadcrumb">{elementBreadcrumb(project, selectedElement)}</span>
         <span className="pill">{selectedElement.kind}</span>
         <strong>{selectedElement.label}</strong>
-        <small>Value: {selectedElement.value}</small>
+        <span className="metric">Value {selectedElement.value}</span>
       </div>
 
       <label className="field">
@@ -611,7 +613,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
       </label>
 
       <button className="action-button ghost full" type="button" onClick={() => updateOverride({ labelVisible: !labelVisible })}>
-        {labelVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+        {labelVisible ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
         {labelVisible ? "Hide label" : "Show label"}
       </button>
 
@@ -651,9 +653,11 @@ function annotationBreadcrumb(project: ChartProject): string {
   return `Chart / ${type} / Annotation`;
 }
 
+/** A labelled on/off control. role="switch" states the semantics that
+ * aria-pressed only implies, so screen readers announce "on"/"off". */
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
-    <button className="toggle-row" type="button" onClick={onChange} aria-pressed={checked}>
+    <button className="toggle-row" type="button" role="switch" aria-checked={checked} onClick={onChange}>
       <span>{label}</span>
       <span className={checked ? "toggle-pill on" : "toggle-pill"} aria-hidden="true">
         <span />

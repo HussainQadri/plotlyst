@@ -5,30 +5,55 @@ import {
   ChartNoAxesColumnIncreasing,
   ChartPie,
   Columns3,
+  Command,
   Download,
   FileImage,
+  Frame,
   LockKeyhole,
+  Maximize2,
+  MoreHorizontal,
+  Moon,
+  PanelLeftClose,
+  PanelRightClose,
   Palette,
   Presentation,
   Redo2,
   RefreshCcw,
-  RotateCcw,
   Share2,
   SlidersHorizontal,
+  Sun,
+  Table2,
   Undo2,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
+import { DatasheetModal } from "./DatasheetModal";
 import { Inspector } from "./Inspector";
+import { CommandPalette, type Command as PaletteCommand } from "./ui/CommandPalette";
+import { Menu, type MenuItem } from "./ui/Menu";
+import { ToastRegion, useToasts } from "./ui/Toaster";
+import { applyAppearance, readStoredAppearance, type Appearance } from "@/lib/appearance";
 import { layoutWaterfall } from "@/lib/chartMath";
+import { ensureChartArtifactStyle } from "@/lib/chartStyles";
 import { decodeExportEntitlementToken, exportDimensions, safeExportName, watermarkText, type ExportBackground, type ExportMode, type ExportScale, type ExportSettings } from "@/lib/export";
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
 import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
 import { validateProject } from "@/lib/validation";
+import {
+  defaultWorkspaceLayout,
+  clampPanelWidth,
+  loadWorkspaceLayout,
+  panelBounds,
+  saveWorkspaceLayout,
+  type WorkspaceLayout
+} from "@/lib/workspaceLayout";
+import { fitZoom, formatZoom, slideFrameVars, stepZoom, type ZoomLevel } from "@/lib/zoom";
 
 const chartTypes: Array<{ id: ChartType; label: string; description: string; icon: LucideIcon }> = [
   { id: "pie", label: "Pie", description: "Composition", icon: ChartPie },
@@ -43,6 +68,12 @@ const defaultExportSettings: ExportSettings = {
   filename: ""
 };
 
+const railTabs: Array<{ id: RailTab; label: string; icon: LucideIcon }> = [
+  { id: "inspector", label: "Inspector", icon: SlidersHorizontal },
+  { id: "export", label: "Export", icon: Download },
+  { id: "issues", label: "Issues", icon: AlertTriangle }
+];
+
 type RailTab = "inspector" | "export" | "issues";
 
 const exportTokenStorageKey = "plotlyst.exportToken.v1";
@@ -56,16 +87,21 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   const [activeRailTab, setActiveRailTab] = useState<RailTab>("inspector");
   const [exportToken, setExportToken] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [shareEnabled, setShareEnabled] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [appearance, setAppearance] = useState<Appearance>("light");
+  const [layout, setLayout] = useState<WorkspaceLayout>(defaultWorkspaceLayout);
+  const [resizing, setResizing] = useState(false);
+  const [zoom, setZoom] = useState<ZoomLevel>(fitZoom);
+  const [datasheetOpen, setDatasheetOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const projectRef = useRef(project);
   const coalescingRef = useRef(false);
   const coalesceTimerRef = useRef<number | null>(null);
   const checkoutHandledRef = useRef(false);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   useEffect(() => {
     projectRef.current = project;
@@ -111,6 +147,8 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     } else {
       window.localStorage.removeItem(exportTokenStorageKey);
     }
+    setAppearance(readStoredAppearance());
+    setLayout(loadWorkspaceLayout());
     setHydrated(true);
   }, [initialProject]);
 
@@ -121,10 +159,24 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   }, [hydrated, project]);
 
   useEffect(() => {
+    if (hydrated) {
+      saveWorkspaceLayout(layout);
+    }
+  }, [hydrated, layout]);
+
+  useEffect(() => {
     fetch("/api/projects/capability")
       .then((response) => (response.ok ? response.json() as Promise<{ enabled?: boolean }> : { enabled: false }))
       .then((payload) => setShareEnabled(Boolean(payload.enabled)))
       .catch(() => setShareEnabled(false));
+  }, []);
+
+  const toggleAppearance = useCallback(() => {
+    setAppearance((current) => {
+      const next: Appearance = current === "dark" ? "light" : "dark";
+      applyAppearance(next);
+      return next;
+    });
   }, []);
 
   const undo = useCallback(() => {
@@ -161,10 +213,17 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   const selectedElements = selectableElements.filter((element) => selectedIds.includes(element.id));
   const selectedElement = selectableElements.find((element) => element.id === selectedId) ?? null;
   const selectedAnnotation = project.annotations.find((annotation) => annotation.id === selectedId) ?? null;
+  const activeChartType = chartTypes.find((chart) => chart.id === project.type) ?? chartTypes[0];
+
+  /** Selecting a rail tab must also reveal the rail it lives in. */
+  const showRailTab = useCallback((tab: RailTab) => {
+    setActiveRailTab(tab);
+    setLayout((current) => (current.rightCollapsed ? { ...current, rightCollapsed: false } : current));
+  }, []);
 
   const verifyCheckout = useCallback(async (sessionId: string) => {
     setExportBusy(true);
-    setExportMessage("Verifying checkout...");
+    pushToast("Verifying checkout…");
 
     try {
       const response = await fetch("/api/export/verify", {
@@ -175,21 +234,21 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
       const payload = (await response.json().catch(() => null)) as { token?: string } | null;
       if (!response.ok || !payload?.token) {
         setExportSettings((current) => ({ ...current, mode: "draft" }));
-        setExportMessage("Checkout could not be verified. Draft export remains available.");
+        pushToast("Checkout could not be verified. Draft export remains available.", "error");
         return;
       }
 
       window.localStorage.setItem(exportTokenStorageKey, payload.token);
       setExportToken(payload.token);
       setExportSettings((current) => ({ ...current, mode: "clean" }));
-      setExportMessage("Clean export unlocked for 24 hours.");
+      pushToast("Clean export unlocked for 24 hours.", "success");
     } catch {
       setExportSettings((current) => ({ ...current, mode: "draft" }));
-      setExportMessage("Checkout verification failed. Draft export remains available.");
+      pushToast("Checkout verification failed. Draft export remains available.", "error");
     } finally {
       setExportBusy(false);
     }
-  }, []);
+  }, [pushToast]);
 
   useEffect(() => {
     if (!hydrated || checkoutHandledRef.current) return;
@@ -201,13 +260,13 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
     checkoutHandledRef.current = true;
     window.setTimeout(() => {
-      setActiveRailTab("export");
+      showRailTab("export");
 
       if (checkout === "success" && sessionId) {
         void verifyCheckout(sessionId);
       } else if (checkout === "cancelled") {
         setExportSettings((current) => ({ ...current, mode: "draft" }));
-        setExportMessage("Checkout cancelled. Draft export remains available.");
+        pushToast("Checkout cancelled. Draft export remains available.");
       }
     }, 0);
 
@@ -215,14 +274,14 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     params.delete("session_id");
     const nextSearch = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
-  }, [hydrated, verifyCheckout]);
+  }, [hydrated, pushToast, showRailTab, verifyCheckout]);
 
   function selectObject(id: string | null, options: { additive?: boolean } = {}) {
     if (!id) {
       setSelectedIds([]);
       return;
     }
-    setActiveRailTab("inspector");
+    showRailTab("inspector");
     setSelectedIds((current) => {
       if (!options.additive) return [id];
       if (current.includes(id)) return current.filter((item) => item !== id);
@@ -238,10 +297,12 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   function resetData() {
     commitProject(createSampleProject(project.type));
     setSelectedIds([]);
+    pushToast("Chart data reset to the sample set.");
   }
 
   function resetVisualEdits() {
     commitProject((current) => ({ ...current, visualOverrides: {}, annotations: current.annotations.map((annotation) => ({ ...annotation, labelOffset: undefined })) }));
+    pushToast("Visual edits cleared.");
   }
 
   const updateVisualOverride = useCallback((id: string, next: Partial<VisualOverride>, options?: { coalesce?: boolean }) => {
@@ -291,7 +352,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
       ]
     }));
     setSelectedIds([id]);
-    setActiveRailTab("inspector");
+    showRailTab("inspector");
   }
 
   const updateAnnotation = useCallback((id: string, next: Partial<Annotation>, options?: { coalesce?: boolean }) => {
@@ -331,51 +392,66 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     return true;
   }, [selectedId, updateAnnotation, updateVisualOverride]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const editing = target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      if (editing) return;
+  const toggleLeftPanel = useCallback(() => {
+    setLayout((current) => ({ ...current, leftCollapsed: !current.leftCollapsed }));
+  }, []);
 
-      const key = event.key;
-      const mod = event.metaKey || event.ctrlKey;
-      if (mod && key.toLowerCase() === "z") {
-        event.preventDefault();
-        if (event.shiftKey) redo();
-        else undo();
-        return;
-      }
-      if (mod && key.toLowerCase() === "y") {
-        event.preventDefault();
-        redo();
-        return;
-      }
-      if (key === "Escape") {
-        setSelectedIds([]);
-        return;
-      }
-      if ((key === "Delete" || key === "Backspace") && selectedId) {
-        event.preventDefault();
-        if (selectedAnnotation) deleteAnnotation(selectedId);
-        else if (selectedElement) deleteElement(selectedId);
-        return;
-      }
-      if (key.startsWith("Arrow")) {
-        const amount = event.shiftKey ? 8 : 2;
-        const dx = key === "ArrowLeft" ? -amount : key === "ArrowRight" ? amount : 0;
-        const dy = key === "ArrowUp" ? -amount : key === "ArrowDown" ? amount : 0;
-        if (nudgeSelection(dx, dy)) event.preventDefault();
-      }
+  const toggleRightPanel = useCallback(() => {
+    setLayout((current) => ({ ...current, rightCollapsed: !current.rightCollapsed }));
+  }, []);
+
+  /** Pointer drag on a panel edge. Widths are clamped and persisted. */
+  function startPanelResize(side: "data" | "inspector", event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = side === "data" ? layout.dataWidth : layout.inspectorWidth;
+    const bounds = side === "data" ? panelBounds.data : panelBounds.inspector;
+    setResizing(true);
+
+    function onMove(moveEvent: PointerEvent) {
+      const delta = side === "data" ? moveEvent.clientX - startX : startX - moveEvent.clientX;
+      const width = clampPanelWidth(startWidth + delta, bounds);
+      setLayout((current) => (side === "data" ? { ...current, dataWidth: width } : { ...current, inspectorWidth: width }));
     }
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [deleteAnnotation, deleteElement, nudgeSelection, redo, selectedAnnotation, selectedElement, selectedId, undo]);
+    function onUp() {
+      setResizing(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  }
+
+  function resizePanelByKey(side: "data" | "inspector", event: React.KeyboardEvent<HTMLButtonElement>) {
+    const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const bounds = side === "data" ? panelBounds.data : panelBounds.inspector;
+    const delta = side === "data" ? step : -step;
+    setLayout((current) =>
+      side === "data"
+        ? { ...current, dataWidth: clampPanelWidth(current.dataWidth + delta, bounds) }
+        : { ...current, inspectorWidth: clampPanelWidth(current.inspectorWidth + delta, bounds) }
+    );
+  }
+
+  function onRailTabKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (offset === 0) return;
+    event.preventDefault();
+    const index = railTabs.findIndex((tab) => tab.id === activeRailTab);
+    const next = railTabs[(index + offset + railTabs.length) % railTabs.length];
+    setActiveRailTab(next.id);
+    event.currentTarget.querySelector<HTMLElement>(`#rail-tab-${next.id}`)?.focus();
+  }
 
   function updateExportSettings(next: Partial<ExportSettings>) {
     setExportSettings((current) => ({ ...current, ...next }));
-    setActiveRailTab("export");
-    setExportMessage(null);
+    showRailTab("export");
   }
 
   function serializeSvg(settings = exportSettings): string | null {
@@ -383,6 +459,9 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
     clone.querySelectorAll("[data-export-hidden='true']").forEach((node) => node.remove());
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    // The artifact stylesheet has to travel with the file or every text element
+    // loses its size, weight and halo once the document stylesheet is gone.
+    ensureChartArtifactStyle(clone);
     const dimensions = exportDimensions(settings.scale);
     clone.setAttribute("width", String(dimensions.width));
     clone.setAttribute("height", String(dimensions.height));
@@ -407,11 +486,50 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     URL.revokeObjectURL(url);
   }
 
+  async function canExport(): Promise<boolean> {
+    if (!validation.valid) {
+      showRailTab("issues");
+      pushToast(`Fix ${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"} before exporting.`, "error");
+      return false;
+    }
+
+    if (exportSettings.mode === "draft") return true;
+
+    showRailTab("export");
+    if (!exportToken || !cleanEntitlement) {
+      pushToast("Clean export requires checkout. Draft export is still available.", "error");
+      return false;
+    }
+
+    setExportBusy(true);
+    try {
+      const response = await fetch("/api/export/authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: exportToken })
+      });
+
+      if (response.ok) return true;
+
+      window.localStorage.removeItem(exportTokenStorageKey);
+      setExportToken(null);
+      setExportSettings((current) => ({ ...current, mode: "draft" }));
+      pushToast("Clean export expired. Run checkout again to unlock it.", "error");
+      return false;
+    } catch {
+      pushToast("Could not authorize clean export. Draft export remains available.", "error");
+      return false;
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   async function exportSvg() {
     if (!(await canExport())) return;
     const svg = serializeSvg();
     if (!svg) return;
     downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "svg");
+    pushToast("SVG downloaded.", "success");
   }
 
   async function exportPng() {
@@ -434,65 +552,34 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
-        if (blob) downloadBlob(blob, "png");
+        if (blob) {
+          downloadBlob(blob, "png");
+          pushToast("PNG downloaded.", "success");
+        }
         URL.revokeObjectURL(svgUrl);
       }, "image/png");
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl);
+      pushToast("PNG could not be rendered.", "error");
     };
     image.src = svgUrl;
   }
 
-  async function canExport(): Promise<boolean> {
-    if (!validation.valid) {
-      setActiveRailTab("issues");
-      return false;
-    }
-
-    if (exportSettings.mode === "draft") return true;
-
-    setActiveRailTab("export");
-    if (!exportToken || !cleanEntitlement) {
-      setExportMessage("Clean export requires checkout. Draft export is still available.");
-      return false;
-    }
-
-    setExportBusy(true);
-    try {
-      const response = await fetch("/api/export/authorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: exportToken })
-      });
-
-      if (response.ok) return true;
-
-      window.localStorage.removeItem(exportTokenStorageKey);
-      setExportToken(null);
-      setExportSettings((current) => ({ ...current, mode: "draft" }));
-      setExportMessage("Clean export expired. Run checkout again to unlock it.");
-      return false;
-    } catch {
-      setExportMessage("Could not authorize clean export. Draft export remains available.");
-      return false;
-    } finally {
-      setExportBusy(false);
-    }
-  }
-
   async function startCheckout() {
-    setActiveRailTab("export");
+    showRailTab("export");
     setExportBusy(true);
-    setExportMessage(null);
 
     try {
       const response = await fetch("/api/checkout", { method: "POST" });
       const payload = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
       if (!response.ok || !payload?.url) {
-        setExportMessage(payload?.error ?? "Checkout is not available.");
+        pushToast(payload?.error ?? "Checkout is not available.", "error");
         return;
       }
       window.location.href = payload.url;
     } catch {
-      setExportMessage("Checkout could not be started.");
+      pushToast("Checkout could not be started.", "error");
     } finally {
       setExportBusy(false);
     }
@@ -500,7 +587,6 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
   async function shareProject() {
     setShareBusy(true);
-    setShareMessage(null);
     setShareUrl(null);
 
     try {
@@ -511,141 +597,456 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
       });
       const payload = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
       if (!response.ok || !payload?.url) {
-        setShareMessage(payload?.error ?? "Share link could not be created.");
+        pushToast(payload?.error ?? "Share link could not be created.", "error");
         return;
       }
       setShareUrl(payload.url);
-      setShareMessage("Share link created.");
+      showRailTab("export");
       await navigator.clipboard?.writeText(payload.url).catch(() => undefined);
+      pushToast("Share link created and copied.", "success");
     } catch {
-      setShareMessage("Share link could not be created.");
+      pushToast("Share link could not be created.", "error");
     } finally {
       setShareBusy(false);
     }
   }
 
+
+  /* Every chrome command in one searchable list. Built during render rather than
+     memoized: the list is small, and the callbacks it closes over change with
+     almost every state field anyway. */
+  const commands: PaletteCommand[] = [
+    ...chartTypes.map((chart) => ({
+      id: `chart-${chart.id}`,
+      group: "Chart type",
+      label: `${chart.label} — ${chart.description}`,
+      icon: chart.icon,
+      keywords: chart.description,
+      disabled: project.type === chart.id,
+      run: () => switchChartType(chart.id)
+    })),
+    { id: "datasheet", group: "Data", label: "Open datasheet", icon: Table2, run: () => setDatasheetOpen(true) },
+    { id: "reset-data", group: "Data", label: "Reset chart data", icon: RefreshCcw, run: resetData },
+    { id: "reset-visual", group: "Data", label: "Reset visual edits", icon: Palette, run: resetVisualEdits },
+    { id: "undo", group: "History", label: "Undo", icon: Undo2, hint: "⌘Z", disabled: history.past.length === 0, run: undo },
+    { id: "redo", group: "History", label: "Redo", icon: Redo2, hint: "⇧⌘Z", disabled: history.future.length === 0, run: redo },
+    { id: "export-svg", group: "Export", label: "Download SVG", icon: Download, run: () => void exportSvg() },
+    { id: "export-png", group: "Export", label: "Download PNG", icon: FileImage, run: () => void exportPng() },
+    { id: "export-settings", group: "Export", label: "Export settings", icon: SlidersHorizontal, run: () => showRailTab("export") },
+    {
+      id: "share",
+      group: "Export",
+      label: "Create share link",
+      icon: Share2,
+      disabled: !shareEnabled || shareBusy,
+      run: () => void shareProject()
+    },
+    { id: "issues", group: "View", label: "Show issues", icon: AlertTriangle, run: () => showRailTab("issues") },
+    { id: "inspector", group: "View", label: "Show inspector", icon: SlidersHorizontal, run: () => showRailTab("inspector") },
+    {
+      id: "toggle-left",
+      group: "View",
+      label: layout.leftCollapsed ? "Show data panel" : "Hide data panel",
+      icon: PanelLeftClose,
+      hint: "[",
+      run: toggleLeftPanel
+    },
+    {
+      id: "toggle-right",
+      group: "View",
+      label: layout.rightCollapsed ? "Show properties panel" : "Hide properties panel",
+      icon: PanelRightClose,
+      hint: "]",
+      run: toggleRightPanel
+    },
+    { id: "zoom-fit", group: "View", label: "Zoom to fit", icon: Frame, hint: "0", run: () => setZoom(fitZoom) },
+    { id: "zoom-100", group: "View", label: "Zoom to 100%", icon: Maximize2, run: () => setZoom(1) },
+    {
+      id: "appearance",
+      group: "View",
+      label: appearance === "dark" ? "Switch to light chrome" : "Switch to dark chrome",
+      icon: appearance === "dark" ? Sun : Moon,
+      run: toggleAppearance
+    },
+    ...themes.map((theme) => ({
+      id: `theme-${theme.id}`,
+      group: "Slide theme",
+      label: theme.name,
+      icon: Palette,
+      keywords: "theme palette colours colors",
+      disabled: project.theme.id === theme.id,
+      run: () => updateTheme(theme.id)
+    }))
+  ];
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const editing = target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      const key = event.key;
+      const mod = event.metaKey || event.ctrlKey;
+
+      if (mod && key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+        return;
+      }
+
+      if (editing) return;
+
+      if (mod && key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (mod && key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (mod) return;
+
+      if (key === "Escape") {
+        setSelectedIds([]);
+        return;
+      }
+      if ((key === "Delete" || key === "Backspace") && selectedId) {
+        event.preventDefault();
+        if (selectedAnnotation) deleteAnnotation(selectedId);
+        else if (selectedElement) deleteElement(selectedId);
+        return;
+      }
+      if (key === "[") {
+        event.preventDefault();
+        toggleLeftPanel();
+        return;
+      }
+      if (key === "]") {
+        event.preventDefault();
+        toggleRightPanel();
+        return;
+      }
+      if (key === "0") {
+        event.preventDefault();
+        setZoom(fitZoom);
+        return;
+      }
+      if (key === "+" || key === "=") {
+        event.preventDefault();
+        setZoom((current) => stepZoom(current, 1));
+        return;
+      }
+      if (key === "-") {
+        event.preventDefault();
+        setZoom((current) => stepZoom(current, -1));
+        return;
+      }
+      if (key.startsWith("Arrow")) {
+        const amount = event.shiftKey ? 8 : 2;
+        const dx = key === "ArrowLeft" ? -amount : key === "ArrowRight" ? amount : 0;
+        const dy = key === "ArrowUp" ? -amount : key === "ArrowDown" ? amount : 0;
+        if (nudgeSelection(dx, dy)) event.preventDefault();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteAnnotation, deleteElement, nudgeSelection, redo, selectedAnnotation, selectedElement, selectedId, toggleLeftPanel, toggleRightPanel, undo]);
+
+  const overflowItems: MenuItem[] = [
+    { kind: "heading", id: "h-data", label: "Data" },
+    { id: "m-datasheet", label: "Open datasheet", icon: Table2, onSelect: () => setDatasheetOpen(true) },
+    { id: "m-reset-visual", label: "Reset visual edits", icon: Palette, onSelect: resetVisualEdits },
+    { id: "m-reset-data", label: "Reset chart data", icon: RefreshCcw, onSelect: resetData },
+    { kind: "separator", id: "s-1" },
+    { kind: "heading", id: "h-share", label: "Share" },
+    {
+      id: "m-share",
+      label: shareBusy ? "Creating share link…" : "Create share link",
+      icon: Share2,
+      disabled: !shareEnabled || shareBusy,
+      onSelect: () => void shareProject()
+    },
+    { id: "m-export-settings", label: "Export settings", icon: SlidersHorizontal, onSelect: () => showRailTab("export") }
+  ];
+
+  const issueCount = validation.errors.length;
+
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      data-left-collapsed={layout.leftCollapsed ? "true" : "false"}
+      data-right-collapsed={layout.rightCollapsed ? "true" : "false"}
+      data-resizing={resizing ? "true" : "false"}
+      style={{
+        ["--data-panel-w" as string]: `${layout.dataWidth}px`,
+        ["--inspector-w" as string]: `${layout.inspectorWidth}px`
+      }}
+    >
       <header className="topbar">
-        <div className="brand-block">
-          <div className="brand-mark" aria-hidden="true">
-            <Presentation size={20} />
-          </div>
-          <div>
-            <p className="eyebrow">Plotlyst</p>
-            <h1>Chart studio</h1>
-          </div>
+        <div className="topbar-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <Presentation size={14} />
+          </span>
+          <h1 className="brand-wordmark">Plotlyst</h1>
         </div>
 
-        <div className="toolbar">
-          <div className="command-group document-fields">
-            <label className="field compact document-title-field">
-              <span>Document</span>
-              <input value={project.title} onChange={(event) => updateTitle(event.target.value)} />
-            </label>
+        <div className="topbar-doc">
+          <input
+            className="doc-title-input"
+            value={project.title}
+            aria-label="Document title"
+            spellCheck={false}
+            onChange={(event) => updateTitle(event.target.value)}
+          />
+          <label className="visually-hidden" htmlFor="slide-theme">
+            Slide theme
+          </label>
+          <select
+            id="slide-theme"
+            className="doc-theme-select"
+            value={project.theme.id}
+            onChange={(event) => updateTheme(event.target.value)}
+          >
+            {themes.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-            <label className="field compact theme-field">
-              <span>Theme</span>
-              <select value={project.theme.id} onChange={(event) => updateTheme(event.target.value)}>
-                {themes.map((theme) => (
-                  <option key={theme.id} value={theme.id}>
-                    {theme.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <div className="topbar-actions">
+          {validation.valid ? (
+            <span className="status-chip ready">Ready</span>
+          ) : (
+            <button type="button" className="status-chip warning" onClick={() => showRailTab("issues")}>
+              {issueCount} issue{issueCount === 1 ? "" : "s"}
+            </button>
+          )}
 
-          <div className="command-group">
-            <span className={validation.valid ? "status-chip ready" : "status-chip warning"}>
-              {validation.valid ? "Ready" : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"}`}
-            </span>
-            <button className="icon-button" type="button" onClick={undo} title="Undo" disabled={history.past.length === 0}>
-              <Undo2 size={18} />
-            </button>
-            <button className="icon-button" type="button" onClick={redo} title="Redo" disabled={history.future.length === 0}>
-              <Redo2 size={18} />
-            </button>
-            <button className="icon-button" type="button" onClick={resetVisualEdits} title="Reset visual edits">
-              <Palette size={18} />
-            </button>
-            <button className="icon-button" type="button" onClick={resetData} title="Reset chart">
-              <RefreshCcw size={18} />
-            </button>
-          </div>
+          <span className="bar-divider" aria-hidden="true" />
 
-          <div className="command-group export-group">
-            {shareEnabled ? (
-              <button className="action-button ghost" type="button" onClick={shareProject} disabled={shareBusy}>
-                <Share2 size={17} />
-                {shareBusy ? "Saving" : "Share"}
-              </button>
-            ) : null}
-            <button className="action-button ghost" type="button" onClick={exportSvg} disabled={exportBusy}>
-              <Download size={17} />
-              SVG
-            </button>
-            <button className="action-button" type="button" onClick={exportPng} disabled={exportBusy}>
-              <FileImage size={17} />
-              PNG
-            </button>
-          </div>
+          <button
+            className="icon-button has-tip tip-below"
+            type="button"
+            onClick={undo}
+            aria-label="Undo"
+            data-tip="Undo ⌘Z"
+            disabled={history.past.length === 0}
+          >
+            <Undo2 size={15} aria-hidden="true" />
+          </button>
+          <button
+            className="icon-button has-tip tip-below"
+            type="button"
+            onClick={redo}
+            aria-label="Redo"
+            data-tip="Redo ⇧⌘Z"
+            disabled={history.future.length === 0}
+          >
+            <Redo2 size={15} aria-hidden="true" />
+          </button>
+
+          <Menu label="More commands" icon={MoreHorizontal} items={overflowItems} />
+
+          <span className="bar-divider" aria-hidden="true" />
+
+          <button
+            className="icon-button has-tip tip-below"
+            type="button"
+            onClick={toggleAppearance}
+            aria-label={appearance === "dark" ? "Use light chrome" : "Use dark chrome"}
+            data-tip={appearance === "dark" ? "Light chrome" : "Dark chrome"}
+          >
+            {appearance === "dark" ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+          </button>
+
+          <button className="palette-trigger" type="button" onClick={() => setPaletteOpen(true)}>
+            <Command size={12} aria-hidden="true" />
+            Commands
+            <span className="kbd">⌘K</span>
+          </button>
+
+          <span className="bar-divider" aria-hidden="true" />
+
+          <button className="action-button ghost" type="button" onClick={() => void exportSvg()} disabled={exportBusy}>
+            <Download size={14} aria-hidden="true" />
+            SVG
+          </button>
+          <button className="action-button" type="button" onClick={() => void exportPng()} disabled={exportBusy}>
+            <FileImage size={14} aria-hidden="true" />
+            PNG
+          </button>
         </div>
       </header>
 
-      <section className="workspace">
-        <aside className="left-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Build</p>
-              <h2>Chart structure</h2>
+      <div className="workspace">
+        <nav className="icon-rail" aria-label="Chart type and panels">
+          {chartTypes.map((chart) => {
+            const Icon = chart.icon;
+            const active = project.type === chart.id;
+            return (
+              <button
+                key={chart.id}
+                type="button"
+                className="rail-button has-tip"
+                aria-label={`${chart.label} — ${chart.description}`}
+                aria-pressed={active}
+                data-tip={`${chart.label} · ${chart.description}`}
+                onClick={() => switchChartType(chart.id)}
+              >
+                <Icon size={17} aria-hidden="true" />
+              </button>
+            );
+          })}
+
+          <span className="rail-divider" aria-hidden="true" />
+
+          <button
+            type="button"
+            className="rail-button has-tip"
+            aria-label="Open datasheet"
+            data-tip="Datasheet"
+            onClick={() => setDatasheetOpen(true)}
+          >
+            <Table2 size={17} aria-hidden="true" />
+          </button>
+
+          <span className="icon-rail-spacer" />
+
+          <button
+            type="button"
+            className="rail-button has-tip"
+            aria-label={layout.leftCollapsed ? "Show data panel" : "Hide data panel"}
+            aria-pressed={!layout.leftCollapsed}
+            data-tip={`${layout.leftCollapsed ? "Show" : "Hide"} data panel  [`}
+            onClick={toggleLeftPanel}
+          >
+            <PanelLeftClose size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="rail-button has-tip"
+            aria-label={layout.rightCollapsed ? "Show properties panel" : "Hide properties panel"}
+            aria-pressed={!layout.rightCollapsed}
+            data-tip={`${layout.rightCollapsed ? "Show" : "Hide"} properties  ]`}
+            onClick={toggleRightPanel}
+          >
+            <PanelRightClose size={16} aria-hidden="true" />
+          </button>
+        </nav>
+
+        <aside className="side-panel data-panel-host" aria-label="Chart data">
+          <div className="panel-head">
+            <h2>{activeChartType.label} data</h2>
+            <div className="panel-head-meta">
+              <button
+                className="table-icon has-tip tip-below-end"
+                type="button"
+                onClick={() => setDatasheetOpen(true)}
+                aria-label="Open datasheet"
+                data-tip="Datasheet"
+              >
+                <Table2 size={14} aria-hidden="true" />
+              </button>
+              <button
+                className="table-icon panel-collapse"
+                type="button"
+                onClick={toggleLeftPanel}
+                aria-label="Hide data panel"
+              >
+                <PanelLeftClose size={14} aria-hidden="true" />
+              </button>
             </div>
-            <span className="panel-kicker">01</span>
           </div>
-
-          <div className="segmented" aria-label="Chart type">
-            {chartTypes.map((chart) => {
-              const Icon = chart.icon;
-              return (
-                <button
-                  key={chart.id}
-                  type="button"
-                  className={project.type === chart.id ? "active" : ""}
-                  onClick={() => switchChartType(chart.id)}
-                >
-                  <Icon size={17} />
-                  <span className="chart-tab-copy">
-                    <strong>{chart.label}</strong>
-                    <small>{chart.description}</small>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="panel-body">
+            <DataPanel
+              project={project}
+              setProject={commitProject}
+              setSelectedId={(id) => {
+                if (id) showRailTab("inspector");
+                setSelectedIds(id ? [id] : []);
+              }}
+            />
           </div>
-
-          <DataPanel
-            project={project}
-            setProject={commitProject}
-            setSelectedId={(id) => {
-              if (id) setActiveRailTab("inspector");
-              setSelectedIds(id ? [id] : []);
-            }}
+          <button
+            className="resize-handle"
+            type="button"
+            role="separator"
+            aria-label="Resize data panel"
+            aria-orientation="vertical"
+            aria-valuenow={layout.dataWidth}
+            aria-valuemin={panelBounds.data.min}
+            aria-valuemax={panelBounds.data.max}
+            onPointerDown={(event) => startPanelResize("data", event)}
+            onKeyDown={(event) => resizePanelByKey("data", event)}
           />
         </aside>
 
-        <section className="canvas-zone">
+        <section className="stage" aria-label="Slide">
           <div className="stage-header">
-            <div className="stage-title">
-              <Presentation size={15} />
-              <strong>Slide 01</strong>
-              <span>{project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}</span>
+            <div className="stage-header-group">
+              <span className="stage-label">
+                <Presentation size={13} aria-hidden="true" />
+                <strong>Slide 01</strong>
+                <span className="dot" aria-hidden="true">
+                  ·
+                </span>
+                {activeChartType.label}
+              </span>
             </div>
-            <div className="stage-spec" aria-label="Slide dimensions">
-              <span>16:9</span>
-              <span>960 x 540</span>
+            <div className="stage-header-group">
+              <span className="stage-label">
+                16:9
+                <span className="dot" aria-hidden="true">
+                  ·
+                </span>
+                960 × 540
+              </span>
+              <span className="bar-divider" aria-hidden="true" />
+              <div className="zoom-cluster">
+                <button
+                  className="icon-button has-tip tip-below"
+                  type="button"
+                  aria-label="Zoom out"
+                  data-tip="Zoom out  −"
+                  onClick={() => setZoom((current) => stepZoom(current, -1))}
+                >
+                  <ZoomOut size={14} aria-hidden="true" />
+                </button>
+                <button
+                  className="zoom-value"
+                  type="button"
+                  aria-label={`Zoom: ${formatZoom(zoom)}. Reset to 100%`}
+                  onClick={() => setZoom((current) => (current === 1 ? fitZoom : 1))}
+                >
+                  {formatZoom(zoom)}
+                </button>
+                <button
+                  className="icon-button has-tip tip-below"
+                  type="button"
+                  aria-label="Zoom in"
+                  data-tip="Zoom in  +"
+                  onClick={() => setZoom((current) => stepZoom(current, 1))}
+                >
+                  <ZoomIn size={14} aria-hidden="true" />
+                </button>
+                <button
+                  className="icon-button has-tip tip-below-end"
+                  type="button"
+                  aria-label="Zoom to fit"
+                  aria-pressed={zoom === fitZoom}
+                  data-tip="Fit  0"
+                  onClick={() => setZoom(fitZoom)}
+                >
+                  <Frame size={14} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="canvas-workbench">
+          <div className="stage-scroll" style={slideFrameVars(zoom) as React.CSSProperties}>
             <ChartCanvas
               ref={svgRef}
               project={project}
@@ -663,119 +1064,196 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
           </div>
         </section>
 
-        <aside className="right-panel">
-          <div className="panel-heading rail-heading">
-            <div>
-              <p className="eyebrow">Format</p>
-              <h2>Properties</h2>
+        <aside className="side-panel inspector-host" aria-label="Properties">
+          <div className="panel-head">
+            <h2>Properties</h2>
+            <div className="panel-head-meta">
+              <span className="status-chip plain">
+                {selectedIds.length > 0 ? `${selectedIds.length} selected` : "Chart"}
+              </span>
+              <button
+                className="table-icon panel-collapse"
+                type="button"
+                onClick={toggleRightPanel}
+                aria-label="Hide properties panel"
+              >
+                <PanelRightClose size={14} aria-hidden="true" />
+              </button>
             </div>
-            <span className="selection-indicator">
-              {selectedIds.length > 0 ? `${selectedIds.length} selected` : "Chart"}
-            </span>
           </div>
 
-          <div className="rail-tabs" aria-label="Right rail">
-            <button type="button" className={activeRailTab === "inspector" ? "active" : ""} onClick={() => setActiveRailTab("inspector")}>
-              <SlidersHorizontal size={15} />
-              Inspector
-            </button>
-            <button type="button" className={activeRailTab === "export" ? "active" : ""} onClick={() => setActiveRailTab("export")}>
-              <Download size={15} />
-              Export
-            </button>
-            <button type="button" className={activeRailTab === "issues" ? "active" : ""} onClick={() => setActiveRailTab("issues")}>
-              <AlertTriangle size={15} />
-              Issues
-              {validation.errors.length > 0 ? <span>{validation.errors.length}</span> : null}
-            </button>
+          <div className="rail-panel">
+            <div className="tab-strip" role="tablist" aria-label="Properties sections" onKeyDown={onRailTabKeyDown}>
+              {railTabs.map((tab) => {
+                const Icon = tab.icon;
+                const selected = activeRailTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    id={`rail-tab-${tab.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`rail-panel-${tab.id}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setActiveRailTab(tab.id)}
+                  >
+                    <Icon size={13} aria-hidden="true" />
+                    {tab.label}
+                    {tab.id === "issues" && issueCount > 0 ? <span className="count-badge">{issueCount}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rail-body" id={`rail-panel-${activeRailTab}`} role="tabpanel" aria-labelledby={`rail-tab-${activeRailTab}`} tabIndex={-1}>
+              {activeRailTab === "inspector" ? (
+                <Inspector
+                  project={project}
+                  setProject={commitProject}
+                  selectedElement={selectedElement}
+                  selectedElements={selectedElements}
+                  selectedAnnotation={selectedAnnotation}
+                  onClearSelection={() => setSelectedIds([])}
+                  onAddAnnotation={addAnnotation}
+                  onUpdateAnnotation={updateAnnotation}
+                  onDeleteAnnotation={deleteAnnotation}
+                />
+              ) : null}
+
+              {activeRailTab === "export" ? (
+                <div className="panel-section">
+                  <div className="section-title">
+                    <Download size={13} aria-hidden="true" />
+                    Output
+                  </div>
+                  <div className="field-grid">
+                    <label className="field">
+                      <span>Mode</span>
+                      <select value={exportSettings.mode} onChange={(event) => updateExportSettings({ mode: event.target.value as ExportMode })}>
+                        <option value="draft">Draft watermark</option>
+                        <option value="clean">Clean</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Scale</span>
+                      <select value={exportSettings.scale} onChange={(event) => updateExportSettings({ scale: Number(event.target.value) as ExportScale })}>
+                        <option value={1}>1x · 1920px</option>
+                        <option value={2}>2x · 3840px</option>
+                        <option value={3}>3x · 5760px</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Background</span>
+                      <select value={exportSettings.background} onChange={(event) => updateExportSettings({ background: event.target.value as ExportBackground })}>
+                        <option value="theme">Theme</option>
+                        <option value="transparent">Transparent</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Filename</span>
+                      <input value={exportSettings.filename} placeholder={safeExportName(project.title)} onChange={(event) => updateExportSettings({ filename: event.target.value })} />
+                    </label>
+                  </div>
+
+                  <p className="quiet">
+                    {exportSettings.mode === "draft"
+                      ? "Draft exports carry a small watermark."
+                      : "Clean exports require a valid checkout token."}
+                  </p>
+
+                  {exportSettings.mode === "clean" && !cleanEntitlement ? (
+                    <button className="action-button full" type="button" onClick={startCheckout} disabled={exportBusy}>
+                      <LockKeyhole size={14} aria-hidden="true" />
+                      {exportBusy ? "Starting checkout…" : "Unlock clean export"}
+                    </button>
+                  ) : null}
+
+                  {cleanEntitlement ? (
+                    <p className="quiet">Clean export unlocked until {new Date(cleanEntitlement.expiresAt).toLocaleString()}.</p>
+                  ) : null}
+
+                  <div className="settings-block">
+                    <div className="subsection-label">Download</div>
+                    <div className="button-row">
+                      <button className="action-button ghost full" type="button" onClick={() => void exportSvg()} disabled={exportBusy}>
+                        <Download size={14} aria-hidden="true" />
+                        SVG
+                      </button>
+                      <button className="action-button full" type="button" onClick={() => void exportPng()} disabled={exportBusy}>
+                        <FileImage size={14} aria-hidden="true" />
+                        PNG
+                      </button>
+                    </div>
+                  </div>
+
+                  {shareEnabled ? (
+                    <div className="settings-block">
+                      <div className="subsection-label">Share</div>
+                      <button className="action-button ghost full" type="button" onClick={() => void shareProject()} disabled={shareBusy}>
+                        <Share2 size={14} aria-hidden="true" />
+                        {shareBusy ? "Creating link…" : "Create share link"}
+                      </button>
+                      {shareUrl ? (
+                        <p className="share-link">
+                          <span>Link</span>
+                          <a href={shareUrl}>{shareUrl}</a>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {activeRailTab === "issues" ? (
+                <div className="panel-section">
+                  <div className="section-title">
+                    <AlertTriangle size={13} aria-hidden="true" />
+                    Validation
+                  </div>
+                  {issueCount === 0 ? (
+                    <div className="empty-state">
+                      <span className="status-chip ready">Ready to export</span>
+                      <p className="quiet">No validation problems in the current chart.</p>
+                    </div>
+                  ) : (
+                    <ul className="error-list">
+                      {validation.errors.map((error) => (
+                        <li key={error}>{error}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          {activeRailTab === "inspector" ? (
-            <Inspector
-              project={project}
-              setProject={commitProject}
-              selectedElement={selectedElement}
-              selectedElements={selectedElements}
-              selectedAnnotation={selectedAnnotation}
-              onClearSelection={() => setSelectedIds([])}
-              onAddAnnotation={addAnnotation}
-              onUpdateAnnotation={updateAnnotation}
-              onDeleteAnnotation={deleteAnnotation}
-            />
-          ) : null}
-
-          {activeRailTab === "export" ? (
-            <div className="panel-section export-settings-panel">
-              <div className="section-title">
-                <Download size={16} />
-                Export
-              </div>
-              <div className="format-grid">
-                <label className="field compact-field">
-                  <span>Mode</span>
-                  <select value={exportSettings.mode} onChange={(event) => updateExportSettings({ mode: event.target.value as ExportMode })}>
-                    <option value="draft">Draft watermark</option>
-                    <option value="clean">Clean</option>
-                  </select>
-                </label>
-                <label className="field compact-field">
-                  <span>Scale</span>
-                  <select value={exportSettings.scale} onChange={(event) => updateExportSettings({ scale: Number(event.target.value) as ExportScale })}>
-                    <option value={1}>1x - 1920px</option>
-                    <option value={2}>2x - 3840px</option>
-                    <option value={3}>3x - 5760px</option>
-                  </select>
-                </label>
-                <label className="field compact-field">
-                  <span>Background</span>
-                  <select value={exportSettings.background} onChange={(event) => updateExportSettings({ background: event.target.value as ExportBackground })}>
-                    <option value="theme">Theme</option>
-                    <option value="transparent">Transparent</option>
-                  </select>
-                </label>
-              </div>
-              <label className="field compact-field">
-                <span>Filename</span>
-                <input value={exportSettings.filename} placeholder={safeExportName(project.title)} onChange={(event) => updateExportSettings({ filename: event.target.value })} />
-              </label>
-              {exportSettings.mode === "clean" && !cleanEntitlement ? (
-                <button className="action-button full" type="button" onClick={startCheckout} disabled={exportBusy}>
-                  <LockKeyhole size={16} />
-                  {exportBusy ? "Starting checkout" : "Unlock clean export"}
-                </button>
-              ) : null}
-              {cleanEntitlement ? <p className="quiet entitlement-note">Clean export unlocked until {new Date(cleanEntitlement.expiresAt).toLocaleString()}.</p> : null}
-              <p className="quiet">{exportSettings.mode === "draft" ? "Draft exports include a small watermark." : "Clean exports require a valid checkout token."}</p>
-              {exportMessage ? <p className="inline-alert">{exportMessage}</p> : null}
-              {shareUrl ? (
-                <p className="share-link">
-                  <span>Share</span>
-                  <a href={shareUrl}>{shareUrl}</a>
-                </p>
-              ) : null}
-              {shareMessage ? <p className="quiet">{shareMessage}</p> : null}
-            </div>
-          ) : null}
-
-          {activeRailTab === "issues" ? (
-            <div className="panel-section">
-              <div className="section-title">
-                <RotateCcw size={16} />
-                Issues
-              </div>
-              {validation.errors.length === 0 ? (
-                <p className="quiet">Chart is ready to export.</p>
-              ) : (
-                <ul className="error-list">
-                  {validation.errors.map((error) => (
-                    <li key={error}>{error}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : null}
+          <button
+            className="resize-handle"
+            type="button"
+            role="separator"
+            aria-label="Resize properties panel"
+            aria-orientation="vertical"
+            aria-valuenow={layout.inspectorWidth}
+            aria-valuemin={panelBounds.inspector.min}
+            aria-valuemax={panelBounds.inspector.max}
+            onPointerDown={(event) => startPanelResize("inspector", event)}
+            onKeyDown={(event) => resizePanelByKey("inspector", event)}
+          />
         </aside>
-      </section>
+      </div>
+
+      {datasheetOpen ? (
+        <DatasheetModal
+          project={project}
+          setProject={commitProject}
+          setSelectedId={(id) => setSelectedIds(id ? [id] : [])}
+          onClose={() => setDatasheetOpen(false)}
+        />
+      ) : null}
+
+      {paletteOpen ? <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} /> : null}
+      <ToastRegion toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
@@ -799,7 +1277,7 @@ function addDraftWatermark(svg: SVGSVGElement, text: string) {
   label.setAttribute("text-anchor", "middle");
   label.setAttribute("fill", "#696d73");
   label.setAttribute("font-size", "11");
-  label.setAttribute("font-weight", "850");
+  label.setAttribute("font-weight", "600");
   label.textContent = text;
 
   group.append(background, label);

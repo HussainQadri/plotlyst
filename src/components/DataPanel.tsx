@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { Plus, Table2, Trash2 } from "lucide-react";
-import { DatasheetModal } from "./DatasheetModal";
 import { parseDelimited, toNumber } from "@/lib/csv";
 import { isCalculatedWaterfallKind, normalizeWaterfallKind } from "@/lib/datasheet";
 import type {
@@ -21,20 +19,15 @@ type DataPanelProps = {
 };
 
 export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps) {
-  const [datasheetOpen, setDatasheetOpen] = useState(false);
-
   return (
-    <div className="panel-section data-panel">
+    <div className="panel-section">
       <div className="section-title split">
         <span>
-          <Table2 size={16} />
-          Data
+          <Table2 size={13} aria-hidden="true" />
+          Series
         </span>
-        <button className="table-icon" type="button" onClick={() => setDatasheetOpen(true)} title="Open datasheet">
-          <Table2 size={15} />
-        </button>
+        <span className="numeric">{dataSummary(project)}</span>
       </div>
-      <p className="hint">{dataSummary(project)}</p>
       {project.type === "pie" && "rows" in project.data ? (
         <PieDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
       ) : null}
@@ -43,9 +36,6 @@ export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps
       ) : null}
       {project.type === "waterfall" && "rows" in project.data ? (
         <WaterfallDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
-      ) : null}
-      {datasheetOpen ? (
-        <DatasheetModal project={project} setProject={setProject} setSelectedId={setSelectedId} onClose={() => setDatasheetOpen(false)} />
       ) : null}
     </div>
   );
@@ -110,9 +100,13 @@ function PieDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
       <table className="data-table" onPaste={(event) => handlePaste(event, pasteRows)}>
         <thead>
           <tr>
-            <th>Label</th>
-            <th>Value</th>
-            <th aria-label="Actions" />
+            <th scope="col">Label</th>
+            <th scope="col" className="value-col">
+              Value
+            </th>
+            <th className="action-col">
+              <span className="visually-hidden">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -121,6 +115,7 @@ function PieDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
               <td>
                 <input
                   value={row.label}
+                  aria-label={`Slice ${row.label} label`}
                   onFocus={() => setSelectedId(row.id)}
                   onChange={(event) => updateRow(row.id, "label", event.target.value)}
                 />
@@ -129,21 +124,27 @@ function PieDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
                 <input
                   type="number"
                   value={row.value}
+                  aria-label={`Slice ${row.label} value`}
                   onFocus={() => setSelectedId(row.id)}
                   onChange={(event) => updateRow(row.id, "value", event.target.value)}
                 />
               </td>
               <td>
-                <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Remove row">
-                  <Trash2 size={15} />
+                <button
+                  className="table-icon danger"
+                  type="button"
+                  onClick={() => removeRow(row.id)}
+                  aria-label={`Remove slice ${row.label}`}
+                >
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button className="action-button full" type="button" onClick={addRow}>
-        <Plus size={16} />
+      <button className="action-button ghost full" type="button" onClick={addRow}>
+        <Plus size={14} aria-hidden="true" />
         Add slice
       </button>
     </>
@@ -289,8 +290,13 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
                 <span>Column label</span>
                 <input value={column.label} onChange={(event) => updateColumnLabel(column.id, event.target.value)} />
               </label>
-              <button className="table-icon" type="button" onClick={() => removeColumn(column.id)} title="Remove column">
-                <Trash2 size={15} />
+              <button
+                className="table-icon danger"
+                type="button"
+                onClick={() => removeColumn(column.id)}
+                aria-label={`Remove column ${column.label}`}
+              >
+                <Trash2 size={13} aria-hidden="true" />
               </button>
             </div>
 
@@ -302,28 +308,28 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
                     type="button"
                     style={{ background: segment.color ?? project.visualOverrides[segment.id]?.fill ?? project.theme.palette[segmentIndex % project.theme.palette.length] }}
                     onClick={() => setSelectedId(segment.id)}
-                    title="Select segment"
+                    aria-label={`Select segment ${segment.label} in ${column.label}`}
                   />
                   <input
-                    aria-label="Segment label"
+                    aria-label={`Segment ${segmentIndex + 1} label`}
                     value={segmentLabels[segmentIndex] ?? segment.label}
                     onFocus={() => setSelectedId(segment.id)}
                     onChange={(event) => updateSegmentLabel(segmentIndex, event.target.value)}
                   />
                   <input
-                    aria-label="Segment value"
+                    aria-label={`${column.label} value for ${segment.label}`}
                     type="number"
                     value={segment.value}
                     onFocus={() => setSelectedId(segment.id)}
                     onChange={(event) => updateSegmentValue(column.id, segmentIndex, event.target.value)}
                   />
                   <button
-                    className="table-icon"
+                    className="table-icon danger"
                     type="button"
                     onClick={() => removeSegment(segmentIndex)}
-                    title="Remove segment across all columns"
+                    aria-label={`Remove segment ${segment.label} from every column`}
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -331,26 +337,34 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
           </details>
         ))}
       </div>
+      {segmentCount > 0 ? (
+        <div className="panel-section">
+          <div className="section-title">Segments across all columns</div>
+          <div className="segment-strip">
+            {segmentLabels.map((label, index) => (
+              <button
+                key={`${label}-${index}`}
+                type="button"
+                onClick={() => removeSegment(index)}
+                aria-label={`Remove segment ${label} from every column`}
+              >
+                <Trash2 size={11} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="button-row sticky-actions">
-        <button className="action-button full" type="button" onClick={addColumn}>
-          <Plus size={16} />
+        <button className="action-button ghost full" type="button" onClick={addColumn}>
+          <Plus size={14} aria-hidden="true" />
           Column
         </button>
-        <button className="action-button full" type="button" onClick={addSegment}>
-          <Plus size={16} />
+        <button className="action-button ghost full" type="button" onClick={addSegment}>
+          <Plus size={14} aria-hidden="true" />
           Segment
         </button>
       </div>
-      {segmentCount > 0 ? (
-        <div className="segment-strip">
-          {segmentLabels.map((label, index) => (
-            <button key={`${label}-${index}`} type="button" onClick={() => removeSegment(index)} title="Remove this segment across all columns">
-              <Trash2 size={13} />
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </>
   );
 }
@@ -428,7 +442,7 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
 
   return (
     <>
-      <div className="waterfall-row-list" onPaste={(event) => handlePaste(event, pasteRows)}>
+      <div className="row-card-list" onPaste={(event) => handlePaste(event, pasteRows)}>
         {data.rows.map((row, index) => (
           <div key={row.id} className={`data-row-card ${project.visualOverrides[row.id] ? "has-override" : ""}`}>
             <div className="row-card-head">
@@ -437,7 +451,7 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
                 value={row.label}
                 onFocus={() => setSelectedId(row.id)}
                 onChange={(event) => updateRow(row.id, "label", event.target.value)}
-                aria-label="Waterfall label"
+                aria-label={`Bar ${index + 1} label`}
               />
             </div>
             <div className="row-card-controls">
@@ -447,33 +461,43 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
                 disabled={isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"}
                 onFocus={() => setSelectedId(row.id)}
                 onChange={(event) => updateRow(row.id, "amount", event.target.value)}
-                aria-label="Waterfall amount"
+                aria-label={`${row.label} amount`}
                 title={
                   isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"
                     ? "Calculated from the running total"
-                    : "Waterfall amount"
+                    : undefined
                 }
               />
-              <select value={row.kind} onFocus={() => setSelectedId(row.id)} onChange={(event) => updateRow(row.id, "kind", event.target.value)} aria-label="Waterfall kind">
+              <select
+                value={row.kind}
+                onFocus={() => setSelectedId(row.id)}
+                onChange={(event) => updateRow(row.id, "kind", event.target.value)}
+                aria-label={`${row.label} bar type`}
+              >
                 <option value="start">Start</option>
                 <option value="change">Change</option>
                 <option value="subtotal">Subtotal</option>
                 <option value="total">Total</option>
               </select>
-              <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Remove row">
-                <Trash2 size={15} />
+              <button
+                className="table-icon danger"
+                type="button"
+                onClick={() => removeRow(row.id)}
+                aria-label={`Remove bar ${row.label}`}
+              >
+                <Trash2 size={13} aria-hidden="true" />
               </button>
             </div>
           </div>
         ))}
       </div>
       <div className="button-row">
-        <button className="action-button full" type="button" onClick={() => addRow("change")}>
-          <Plus size={16} />
+        <button className="action-button ghost full" type="button" onClick={() => addRow("change")}>
+          <Plus size={14} aria-hidden="true" />
           Add bar
         </button>
         <button className="action-button ghost full" type="button" onClick={() => addRow("subtotal")}>
-          <Plus size={16} />
+          <Plus size={14} aria-hidden="true" />
           Subtotal
         </button>
       </div>
