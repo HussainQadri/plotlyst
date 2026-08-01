@@ -10,6 +10,9 @@ import type {
   NegativeStyle,
   NumberFormatSettings,
   NumberScale,
+  SankeyAlign,
+  SankeySettings,
+  ScatterSettings,
   WaterfallBuildMode,
   WaterfallConnectorStyle,
   WaterfallSettings,
@@ -37,6 +40,27 @@ export function defaultLabelSettings(type: ChartType): LabelSettings {
   };
 }
 
+export function defaultSankeySettings(): SankeySettings {
+  return {
+    nodeWidth: 18,
+    nodePadding: 14,
+    align: "justify",
+    showNodeLabels: true,
+    showLinkLabels: false
+  };
+}
+
+export function defaultScatterSettings(): ScatterSettings {
+  return {
+    xLabel: "",
+    yLabel: "",
+    showGrid: true,
+    showQuadrants: false,
+    showBubbles: true,
+    quadrantLabels: ["", "", "", ""]
+  };
+}
+
 export function defaultChartSettings(type: ChartType): ChartSettings {
   return {
     showLegend: true,
@@ -44,7 +68,9 @@ export function defaultChartSettings(type: ChartType): ChartSettings {
     showLabels: true,
     labelContent: defaultLabelSettings(type),
     waterfall: defaultWaterfallSettings(),
-    mekko: defaultMekkoSettings()
+    mekko: defaultMekkoSettings(),
+    sankey: defaultSankeySettings(),
+    scatter: defaultScatterSettings()
   };
 }
 
@@ -91,7 +117,9 @@ export function normalizeChartSettings(raw: unknown, type: ChartType): ChartSett
       percentDecimals: clampInteger(rawLabelContent?.percentDecimals, 0, 2, defaults.labelContent.percentDecimals)
     },
     waterfall: normalizeWaterfallSettings(raw.waterfall, defaults.waterfall),
-    mekko: normalizeMekkoSettings(raw.mekko, defaults.mekko)
+    mekko: normalizeMekkoSettings(raw.mekko, defaults.mekko),
+    sankey: normalizeSankeySettings(raw.sankey, defaults.sankey),
+    scatter: normalizeScatterSettings(raw.scatter, defaults.scatter)
   };
 }
 
@@ -236,6 +264,40 @@ function normalizeMekkoSegmentOrder(raw: unknown, fallback: MekkoSegmentOrder): 
 
 function normalizeNegativeStyle(raw: unknown, fallback: NegativeStyle): NegativeStyle {
   if (raw === "minus" || raw === "parentheses") return raw;
+  return fallback;
+}
+
+function normalizeSankeySettings(raw: unknown, fallback: SankeySettings): SankeySettings {
+  if (!isRecord(raw)) return fallback;
+  return {
+    nodeWidth: clampInteger(raw.nodeWidth, 8, 40, fallback.nodeWidth),
+    nodePadding: clampInteger(raw.nodePadding, 4, 40, fallback.nodePadding),
+    align: normalizeSankeyAlign(raw.align, fallback.align),
+    showNodeLabels: typeof raw.showNodeLabels === "boolean" ? raw.showNodeLabels : fallback.showNodeLabels,
+    showLinkLabels: typeof raw.showLinkLabels === "boolean" ? raw.showLinkLabels : fallback.showLinkLabels
+  };
+}
+
+function normalizeScatterSettings(raw: unknown, fallback: ScatterSettings): ScatterSettings {
+  if (!isRecord(raw)) return fallback;
+  const rawQ = Array.isArray(raw.quadrantLabels) ? raw.quadrantLabels : [];
+  return {
+    xLabel: typeof raw.xLabel === "string" ? raw.xLabel.slice(0, 60) : fallback.xLabel,
+    yLabel: typeof raw.yLabel === "string" ? raw.yLabel.slice(0, 60) : fallback.yLabel,
+    showGrid: typeof raw.showGrid === "boolean" ? raw.showGrid : fallback.showGrid,
+    showQuadrants: typeof raw.showQuadrants === "boolean" ? raw.showQuadrants : fallback.showQuadrants,
+    showBubbles: typeof raw.showBubbles === "boolean" ? raw.showBubbles : fallback.showBubbles,
+    quadrantLabels: [
+      typeof rawQ[0] === "string" ? rawQ[0] : fallback.quadrantLabels[0],
+      typeof rawQ[1] === "string" ? rawQ[1] : fallback.quadrantLabels[1],
+      typeof rawQ[2] === "string" ? rawQ[2] : fallback.quadrantLabels[2],
+      typeof rawQ[3] === "string" ? rawQ[3] : fallback.quadrantLabels[3]
+    ]
+  };
+}
+
+function normalizeSankeyAlign(raw: unknown, fallback: SankeyAlign): SankeyAlign {
+  if (raw === "left" || raw === "right" || raw === "justify") return raw;
   return fallback;
 }
 

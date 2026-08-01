@@ -1,4 +1,4 @@
-export type ChartType = "pie" | "marimekko" | "waterfall";
+export type ChartType = "pie" | "marimekko" | "waterfall" | "sankey" | "scatter";
 
 export type LabelPlacement = "auto" | "inside" | "outside" | "callout";
 
@@ -90,6 +90,25 @@ export type Annotation = {
   labelOffset?: { dx: number; dy: number };
 };
 
+export type SankeyAlign = "left" | "right" | "justify";
+
+export type SankeySettings = {
+  nodeWidth: number;
+  nodePadding: number;
+  align: SankeyAlign;
+  showNodeLabels: boolean;
+  showLinkLabels: boolean;
+};
+
+export type ScatterSettings = {
+  xLabel: string;
+  yLabel: string;
+  showGrid: boolean;
+  showQuadrants: boolean;
+  showBubbles: boolean;
+  quadrantLabels: [string, string, string, string];
+};
+
 export type ChartSettings = {
   showLegend: boolean;
   showTitle: boolean;
@@ -97,6 +116,8 @@ export type ChartSettings = {
   labelContent: LabelSettings;
   waterfall: WaterfallSettings;
   mekko: MekkoSettings;
+  sankey: SankeySettings;
+  scatter: ScatterSettings;
 };
 
 export type PieDatum = {
@@ -141,7 +162,39 @@ export type WaterfallData = {
   rows: WaterfallDatum[];
 };
 
-export type ChartData = PieData | MarimekkoData | WaterfallData;
+export type SankeyNode = {
+  id: string;
+  label: string;
+  color?: string;
+};
+
+export type SankeyLink = {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  value: number;
+  color?: string;
+};
+
+export type SankeyData = {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+};
+
+export type ScatterPoint = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  size?: number;
+  color?: string;
+};
+
+export type ScatterData = {
+  points: ScatterPoint[];
+};
+
+export type ChartData = PieData | MarimekkoData | WaterfallData | SankeyData | ScatterData;
 
 export type ChartProject = {
   id: string;
@@ -158,5 +211,5 @@ export type SelectableElement = {
   id: string;
   label: string;
   value: number;
-  kind: "slice" | "segment" | "bar";
+  kind: "slice" | "segment" | "bar" | "point" | "node";
 };
