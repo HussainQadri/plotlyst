@@ -8,6 +8,8 @@ import type {
   MarimekkoColumn,
   MarimekkoData,
   PieData,
+  SankeyData,
+  ScatterData,
   WaterfallData,
   WaterfallKind
 } from "@/lib/types";
@@ -36,6 +38,12 @@ export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps
       ) : null}
       {project.type === "waterfall" && "rows" in project.data ? (
         <WaterfallDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
+      ) : null}
+      {project.type === "sankey" && "nodes" in project.data ? (
+        <SankeyDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
+      ) : null}
+      {project.type === "scatter" && "points" in project.data ? (
+        <ScatterDataEditor project={project} setProject={setProject} setSelectedId={setSelectedId} />
       ) : null}
     </div>
   );
@@ -505,6 +513,174 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
   );
 }
 
+function SankeyDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
+  const data = project.data as SankeyData;
+
+  function updateNode(id: string, label: string) {
+    setProject((c) => ({ ...c, data: { ...c.data, nodes: (c.data as SankeyData).nodes.map((n) => (n.id === id ? { ...n, label } : n)) } as SankeyData }));
+  }
+
+  function addNode() {
+    const id = makeId("sk-node");
+    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), nodes: [...(c.data as SankeyData).nodes, { id, label: "New node" }] } }));
+    setSelectedId(id);
+  }
+
+  function removeNode(id: string) {
+    setProject((c) => {
+      const ov = { ...c.visualOverrides };
+      delete ov[id];
+      const d = c.data as SankeyData;
+      return { ...c, visualOverrides: ov, data: { nodes: d.nodes.filter((n) => n.id !== id), links: d.links.filter((l) => l.sourceId !== id && l.targetId !== id) } };
+    });
+    setSelectedId(null);
+  }
+
+  function updateLink(id: string, field: "sourceId" | "targetId" | "value", value: string) {
+    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), links: (c.data as SankeyData).links.map((l) => l.id !== id ? l : { ...l, [field]: field === "value" ? Number(value) : value }) } }));
+  }
+
+  function addLink() {
+    const first = data.nodes[0];
+    const second = data.nodes[1];
+    if (!first || !second) return;
+    const id = makeId("sk-link");
+    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), links: [...(c.data as SankeyData).links, { id, sourceId: first.id, targetId: second.id, value: 10 }] } }));
+  }
+
+  function removeLink(id: string) {
+    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), links: (c.data as SankeyData).links.filter((l) => l.id !== id) } }));
+  }
+
+  return (
+    <>
+      <div className="section-title" style={{ marginTop: 8 }}>Nodes</div>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th className="action-col"><span className="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.nodes.map((node) => (
+            <tr key={node.id}>
+              <td>
+                <input value={node.label} onFocus={() => setSelectedId(node.id)} onChange={(e) => updateNode(node.id, e.target.value)} aria-label={`Node ${node.label} label`} />
+              </td>
+              <td>
+                <button className="table-icon danger" type="button" onClick={() => removeNode(node.id)} aria-label={`Remove node ${node.label}`}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="action-button ghost full" type="button" onClick={addNode}>
+        <Plus size={14} aria-hidden="true" />
+        Add node
+      </button>
+
+      <div className="section-title" style={{ marginTop: 12 }}>Links</div>
+      {data.links.map((link) => (
+        <div key={link.id} className="data-row-card">
+          <div className="row-card-controls">
+            <select value={link.sourceId} onChange={(e) => updateLink(link.id, "sourceId", e.target.value)} aria-label="Source node">
+              {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
+            </select>
+            <span style={{ fontSize: 10, color: "var(--color-muted)" }}>→</span>
+            <select value={link.targetId} onChange={(e) => updateLink(link.id, "targetId", e.target.value)} aria-label="Target node">
+              {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
+            </select>
+            <input type="number" value={link.value} style={{ width: 60 }} onChange={(e) => updateLink(link.id, "value", e.target.value)} aria-label="Link value" />
+            <button className="table-icon danger" type="button" onClick={() => removeLink(link.id)} aria-label="Remove link">
+              <Trash2 size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ))}
+      <button className="action-button ghost full" type="button" onClick={addLink} disabled={data.nodes.length < 2}>
+        <Plus size={14} aria-hidden="true" />
+        Add link
+      </button>
+    </>
+  );
+}
+
+function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
+  const data = project.data as ScatterData;
+
+  function updatePoint(id: string, field: "label" | "x" | "y" | "size", value: string) {
+    setProject((c) => ({
+      ...c,
+      data: {
+        points: (c.data as ScatterData).points.map((p) =>
+          p.id !== id ? p : { ...p, [field]: field === "label" ? value : Number(value) }
+        )
+      }
+    }));
+  }
+
+  function addPoint() {
+    const id = makeId("sc");
+    setProject((c) => ({ ...c, data: { points: [...(c.data as ScatterData).points, { id, label: "New point", x: 50, y: 50, size: 100 }] } }));
+    setSelectedId(id);
+  }
+
+  function removePoint(id: string) {
+    setProject((c) => {
+      const ov = { ...c.visualOverrides };
+      delete ov[id];
+      return { ...c, visualOverrides: ov, data: { points: (c.data as ScatterData).points.filter((p) => p.id !== id) } };
+    });
+    setSelectedId(null);
+  }
+
+  return (
+    <>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th className="value-col">X</th>
+            <th className="value-col">Y</th>
+            <th className="value-col">Size</th>
+            <th className="action-col"><span className="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.points.map((point) => (
+            <tr key={point.id} className={project.visualOverrides[point.id] ? "has-override" : ""}>
+              <td>
+                <input value={point.label} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "label", e.target.value)} aria-label={`Point ${point.label} label`} />
+              </td>
+              <td>
+                <input type="number" value={point.x} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "x", e.target.value)} aria-label={`${point.label} x`} />
+              </td>
+              <td>
+                <input type="number" value={point.y} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "y", e.target.value)} aria-label={`${point.label} y`} />
+              </td>
+              <td>
+                <input type="number" value={point.size ?? ""} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "size", e.target.value)} aria-label={`${point.label} bubble size`} />
+              </td>
+              <td>
+                <button className="table-icon danger" type="button" onClick={() => removePoint(point.id)} aria-label={`Remove point ${point.label}`}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="action-button ghost full" type="button" onClick={addPoint}>
+        <Plus size={14} aria-hidden="true" />
+        Add point
+      </button>
+    </>
+  );
+}
+
 function handlePaste(event: React.ClipboardEvent, callback: (text: string) => void) {
   const text = event.clipboardData.getData("text");
   if (!text.includes("\t") && !text.includes(",") && !text.includes("\n")) return;
@@ -535,6 +711,14 @@ function dataSummary(project: ChartProject): string {
 
   if (project.type === "waterfall" && "rows" in project.data) {
     return `${project.data.rows.length} bars`;
+  }
+
+  if (project.type === "sankey" && "nodes" in project.data) {
+    return `${project.data.nodes.length} nodes / ${project.data.links.length} links`;
+  }
+
+  if (project.type === "scatter" && "points" in project.data) {
+    return `${project.data.points.length} points`;
   }
 
   return "Chart data";

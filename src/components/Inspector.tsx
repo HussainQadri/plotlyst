@@ -11,6 +11,7 @@ import type {
   MekkoSegmentOrder,
   NegativeStyle,
   NumberScale,
+  SankeyAlign,
   SelectableElement,
   VisualOverride,
   WaterfallBuildMode,
@@ -140,6 +141,26 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
     }));
   }
 
+  function updateSankeySettings(next: Partial<ChartProject["settings"]["sankey"]>) {
+    setProject((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        sankey: { ...current.settings.sankey, ...next }
+      }
+    }));
+  }
+
+  function updateScatterSettings(next: Partial<ChartProject["settings"]["scatter"]>) {
+    setProject((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        scatter: { ...current.settings.scatter, ...next }
+      }
+    }));
+  }
+
   function toggleLabelField(field: LabelContentField) {
     const current = project.settings.labelContent.fields;
     const fields = current.includes(field) ? current.filter((item) => item !== field) : [...current, field];
@@ -188,7 +209,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
 
         <div className="selected-summary">
           <span className="breadcrumb">
-            Chart / {project.type === "marimekko" ? "Marimekko" : project.type === "waterfall" ? "Waterfall" : "Pie"}
+            Chart / {chartTypeName(project.type)}
           </span>
           <span className="pill">{selectedElements.length} marks</span>
           <strong>{selectedElements.map((element) => element.label).join(", ")}</strong>
@@ -528,6 +549,67 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
           </div>
         ) : null}
 
+        {project.type === "sankey" ? (
+          <div className="settings-block">
+            <div className="subsection-label">Sankey</div>
+            <div className="field-grid">
+              <label className="field">
+                <span>Node width</span>
+                <input type="number" min="8" max="40" value={project.settings.sankey.nodeWidth} onChange={(e) => updateSankeySettings({ nodeWidth: Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Node gap</span>
+                <input type="number" min="4" max="40" value={project.settings.sankey.nodePadding} onChange={(e) => updateSankeySettings({ nodePadding: Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Align</span>
+                <select value={project.settings.sankey.align} onChange={(e) => updateSankeySettings({ align: e.target.value as SankeyAlign })}>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="justify">Justify</option>
+                </select>
+              </label>
+            </div>
+            <ToggleRow label="Node labels" checked={project.settings.sankey.showNodeLabels} onChange={() => updateSankeySettings({ showNodeLabels: !project.settings.sankey.showNodeLabels })} />
+            <ToggleRow label="Link labels" checked={project.settings.sankey.showLinkLabels} onChange={() => updateSankeySettings({ showLinkLabels: !project.settings.sankey.showLinkLabels })} />
+          </div>
+        ) : null}
+
+        {project.type === "scatter" ? (
+          <div className="settings-block">
+            <div className="subsection-label">Scatter / Bubble</div>
+            <label className="field">
+              <span>X axis label</span>
+              <input value={project.settings.scatter.xLabel} onChange={(e) => updateScatterSettings({ xLabel: e.target.value })} placeholder="X axis" />
+            </label>
+            <label className="field">
+              <span>Y axis label</span>
+              <input value={project.settings.scatter.yLabel} onChange={(e) => updateScatterSettings({ yLabel: e.target.value })} placeholder="Y axis" />
+            </label>
+            <ToggleRow label="Grid" checked={project.settings.scatter.showGrid} onChange={() => updateScatterSettings({ showGrid: !project.settings.scatter.showGrid })} />
+            <ToggleRow label="Quadrants" checked={project.settings.scatter.showQuadrants} onChange={() => updateScatterSettings({ showQuadrants: !project.settings.scatter.showQuadrants })} />
+            <ToggleRow label="Bubbles" checked={project.settings.scatter.showBubbles} onChange={() => updateScatterSettings({ showBubbles: !project.settings.scatter.showBubbles })} />
+            {project.settings.scatter.showQuadrants ? (
+              <div className="field-grid">
+                {(["Top-left", "Top-right", "Bottom-left", "Bottom-right"] as const).map((corner, qi) => (
+                  <label className="field" key={corner}>
+                    <span>{corner}</span>
+                    <input
+                      value={project.settings.scatter.quadrantLabels[qi]}
+                      placeholder={corner}
+                      onChange={(e) => {
+                        const next = [...project.settings.scatter.quadrantLabels] as [string, string, string, string];
+                        next[qi] = e.target.value;
+                        updateScatterSettings({ quadrantLabels: next });
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <p className="quiet selection-note">Select a chart object to edit its custom label, color, placement, and position.</p>
       </div>
     );
@@ -643,14 +725,21 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
   );
 }
 
+function chartTypeName(type: ChartProject["type"]): string {
+  if (type === "pie") return "Pie";
+  if (type === "waterfall") return "Waterfall";
+  if (type === "marimekko") return "Marimekko";
+  if (type === "sankey") return "Sankey";
+  if (type === "scatter") return "Scatter";
+  return "Chart";
+}
+
 function elementBreadcrumb(project: ChartProject, element: SelectableElement): string {
-  const type = project.type === "pie" ? "Pie" : project.type === "waterfall" ? "Waterfall" : "Marimekko";
-  return `Chart / ${type} / ${element.label}`;
+  return `Chart / ${chartTypeName(project.type)} / ${element.label}`;
 }
 
 function annotationBreadcrumb(project: ChartProject): string {
-  const type = project.type === "pie" ? "Pie" : project.type === "waterfall" ? "Waterfall" : "Marimekko";
-  return `Chart / ${type} / Annotation`;
+  return `Chart / ${chartTypeName(project.type)} / Annotation`;
 }
 
 /** A labelled on/off control. role="switch" states the semantics that

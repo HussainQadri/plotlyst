@@ -4,8 +4,10 @@ import {
   AlertTriangle,
   ChartNoAxesColumnIncreasing,
   ChartPie,
+  ChartScatter,
   Columns3,
   Command,
+  GitMerge,
   Download,
   FileImage,
   Frame,
@@ -43,7 +45,7 @@ import { decodeExportEntitlementToken, exportDimensions, safeExportName, waterma
 import { createSampleProject } from "@/lib/samples";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
-import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
+import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SankeyData, ScatterData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
 import { validateProject } from "@/lib/validation";
 import {
   defaultWorkspaceLayout,
@@ -58,7 +60,9 @@ import { fitZoom, formatZoom, slideFrameVars, stepZoom, type ZoomLevel } from "@
 const chartTypes: Array<{ id: ChartType; label: string; description: string; icon: LucideIcon }> = [
   { id: "pie", label: "Pie", description: "Composition", icon: ChartPie },
   { id: "marimekko", label: "Marimekko", description: "Market map", icon: Columns3 },
-  { id: "waterfall", label: "Waterfall", description: "Variance bridge", icon: ChartNoAxesColumnIncreasing }
+  { id: "waterfall", label: "Waterfall", description: "Variance bridge", icon: ChartNoAxesColumnIncreasing },
+  { id: "sankey", label: "Sankey", description: "Flow diagram", icon: GitMerge },
+  { id: "scatter", label: "Scatter", description: "Portfolio / bubble", icon: ChartScatter }
 ];
 
 const defaultExportSettings: ExportSettings = {
@@ -1318,6 +1322,18 @@ function addChartElementAfter(project: ChartProject, id: string): ChartProject {
     };
   }
 
+  if (project.type === "sankey") {
+    const newId = makeId("sk-node");
+    const d = project.data as SankeyData;
+    return { ...project, data: { ...d, nodes: [...d.nodes, { id: newId, label: "New node" }] } };
+  }
+
+  if (project.type === "scatter") {
+    const newId = makeId("sc");
+    const d = project.data as ScatterData;
+    return { ...project, data: { points: [...d.points, { id: newId, label: "New point", x: 50, y: 50, size: 100 }] } };
+  }
+
   return project;
 }
 
@@ -1355,6 +1371,21 @@ function deleteChartElement(project: ChartProject, id: string): ChartProject {
         }))
       }
     };
+  }
+
+  if (project.type === "sankey") {
+    const d = project.data as SankeyData;
+    return {
+      ...project,
+      visualOverrides,
+      annotations,
+      data: { nodes: d.nodes.filter((n) => n.id !== id), links: d.links.filter((l) => l.sourceId !== id && l.targetId !== id) }
+    };
+  }
+
+  if (project.type === "scatter") {
+    const d = project.data as ScatterData;
+    return { ...project, visualOverrides, annotations, data: { points: d.points.filter((p) => p.id !== id) } };
   }
 
   return { ...project, visualOverrides, annotations };
@@ -1409,6 +1440,26 @@ function getSelectableElements(project: ChartProject): SelectableElement[] {
       label: bar.label,
       value: bar.displayValue,
       kind: "bar"
+    }));
+  }
+
+  if (project.type === "sankey" && "nodes" in project.data) {
+    const d = project.data as SankeyData;
+    return d.nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      value: d.links.filter((l) => l.targetId === node.id).reduce((s, l) => s + l.value, 0),
+      kind: "node" as const
+    }));
+  }
+
+  if (project.type === "scatter" && "points" in project.data) {
+    const d = project.data as ScatterData;
+    return d.points.map((point) => ({
+      id: point.id,
+      label: point.label,
+      value: point.size ?? 0,
+      kind: "point" as const
     }));
   }
 
