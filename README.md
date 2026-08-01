@@ -24,8 +24,26 @@ It is built for the charts that usually end up in strategy decks, board updates,
 - Per-mark color and visibility overrides
 - Waterfall starts, changes, subtotals, totals, and connectors
 - SVG-first rendering with watermarked draft export and paid clean SVG/PNG export
+- Self-contained exports: the artifact stylesheet ships inside the SVG, so a downloaded file keeps its typography
+- Light and dark chrome, following the system by default; the slide stays light in both
+- Resizable and collapsible side panels, remembered between sessions
+- Stage zoom with fit mode
 - Local browser persistence through `localStorage`
 - Anonymous share links when KV storage is configured
+
+## Keyboard
+
+| Keys | Action |
+| --- | --- |
+| `⌘K` / `Ctrl+K` | Command palette — every editor command, searchable |
+| `⌘Z` / `⇧⌘Z` | Undo / redo |
+| `[` `]` | Toggle the data and properties panels |
+| `-` `+` `0` | Zoom out, zoom in, zoom to fit |
+| Arrows | Nudge the selected label 2px (`⇧` for 8px) |
+| `Delete` | Remove the selected mark or annotation |
+| `Esc` | Clear selection |
+
+Shortcuts other than the palette are suppressed while a field has focus.
 
 ## Try It
 

@@ -2,6 +2,7 @@
 
 import { Columns3, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { useFocusTrap } from "./ui/useFocusTrap";
 import {
   isCalculatedWaterfallKind,
   normalizeWaterfallKind,
@@ -31,6 +32,8 @@ type CellPosition = {
 };
 
 export function DatasheetModal({ project, setProject, setSelectedId, onClose }: DatasheetModalProps) {
+  const dialogRef = useFocusTrap<HTMLElement>(true);
+
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
@@ -42,14 +45,21 @@ export function DatasheetModal({ project, setProject, setSelectedId, onClose }: 
 
   return (
     <div className="datasheet-overlay" role="presentation" onMouseDown={onClose}>
-      <section className="datasheet-dialog" role="dialog" aria-modal="true" aria-label={`${project.type} datasheet`} onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        ref={dialogRef}
+        className="datasheet-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${project.type} datasheet`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="datasheet-header">
           <div>
             <p className="eyebrow">Datasheet</p>
             <h2>{datasheetTitle(project)}</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} title="Close datasheet">
-            <X size={18} />
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Close datasheet">
+            <X size={15} aria-hidden="true" />
           </button>
         </header>
 
@@ -109,9 +119,9 @@ function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModa
   return (
     <>
       <div className="datasheet-toolbar">
-        <span className="status-chip">{data.rows.length} rows</span>
-        <button className="action-button" type="button" onClick={addRow}>
-          <Plus size={16} />
+        <span className="status-chip plain numeric">{data.rows.length} rows</span>
+        <button className="action-button ghost" type="button" onClick={addRow}>
+          <Plus size={14} aria-hidden="true" />
           Row
         </button>
       </div>
@@ -147,8 +157,8 @@ function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModa
                   />
                 </td>
                 <td>
-                  <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Delete row">
-                    <Trash2 size={15} />
+                  <button className="table-icon danger" type="button" onClick={() => removeRow(row.id)} aria-label={`Delete row ${rowIndex + 1}`}>
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </td>
               </tr>
@@ -213,13 +223,13 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
   return (
     <>
       <div className="datasheet-toolbar">
-        <span className="status-chip">{data.rows.length} rows</span>
-        <button className="action-button" type="button" onClick={() => addRow("change")}>
-          <Plus size={16} />
+        <span className="status-chip plain numeric">{data.rows.length} rows</span>
+        <button className="action-button ghost" type="button" onClick={() => addRow("change")}>
+          <Plus size={14} aria-hidden="true" />
           Row
         </button>
         <button className="action-button ghost" type="button" onClick={() => addRow("subtotal")}>
-          <Plus size={16} />
+          <Plus size={14} aria-hidden="true" />
           Subtotal
         </button>
       </div>
@@ -273,8 +283,8 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                     </select>
                   </td>
                   <td>
-                    <button className="table-icon" type="button" onClick={() => removeRow(row.id)} title="Delete row">
-                      <Trash2 size={15} />
+                    <button className="table-icon danger" type="button" onClick={() => removeRow(row.id)} aria-label={`Delete row ${rowIndex + 1}`}>
+                      <Trash2 size={13} aria-hidden="true" />
                     </button>
                   </td>
                 </tr>
@@ -399,14 +409,14 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
   return (
     <>
       <div className="datasheet-toolbar">
-        <span className="status-chip">{data.columns.length} columns</span>
-        <span className="status-chip">{segmentCount} segments</span>
-        <button className="action-button" type="button" onClick={addColumn}>
-          <Columns3 size={16} />
+        <span className="status-chip plain numeric">{data.columns.length} columns</span>
+        <span className="status-chip plain numeric">{segmentCount} segments</span>
+        <button className="action-button ghost" type="button" onClick={addColumn}>
+          <Columns3 size={14} aria-hidden="true" />
           Column
         </button>
         <button className="action-button ghost" type="button" onClick={addSegment}>
-          <Plus size={16} />
+          <Plus size={14} aria-hidden="true" />
           Segment
         </button>
       </div>
@@ -414,7 +424,7 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
         <table className="sheet-table mekko-sheet" onPaste={(event) => handleSheetPaste(event, pasteSheet)}>
           <thead>
             <tr>
-              <th className="sheet-index">Segment</th>
+              <th className="sheet-row-label">Segment</th>
               {data.columns.map((column, columnIndex) => (
                 <th key={column.id}>
                   <div className="sheet-header-cell">
@@ -423,7 +433,7 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                       position={{ row: 0, col: columnIndex + 1 }}
                       onChange={(value) => updateColumnLabel(column.id, value)}
                     />
-                    <button className="table-icon" type="button" onClick={() => removeColumn(column.id)} title="Delete column">
+                    <button className="table-icon danger" type="button" onClick={() => removeColumn(column.id)} aria-label={`Delete column ${column.label}`}>
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -459,8 +469,8 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                   );
                 })}
                 <td>
-                  <button className="table-icon" type="button" onClick={() => removeSegment(segmentIndex)} title="Delete segment">
-                    <Trash2 size={15} />
+                  <button className="table-icon danger" type="button" onClick={() => removeSegment(segmentIndex)} aria-label={`Delete segment ${segmentLabels[segmentIndex] ?? segmentIndex + 1}`}>
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </td>
               </tr>
