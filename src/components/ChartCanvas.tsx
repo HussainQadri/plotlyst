@@ -8,14 +8,20 @@ import {
   describeArc,
   layoutMarimekko,
   layoutPie,
+  layoutSankey,
+  layoutScatter,
   layoutWaterfall,
   type MarimekkoSegmentLayout,
   type PieSliceLayout,
+  type SankeyNodeLayout,
+  type SankeyLinkLayout,
+  type ScatterPointLayout,
+  type ScatterAxisTick,
   type WaterfallBarLayout
 } from "@/lib/chartMath";
 import { buildLabelLines, formatPercent, formatValue } from "@/lib/labels";
 import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
-import type { Annotation, ChartProject, LabelPlacement, MarimekkoData, PieData, VisualOverride, WaterfallData } from "@/lib/types";
+import type { Annotation, ChartProject, LabelPlacement, MarimekkoData, PieData, SankeyData, ScatterData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
 
 const labelSnapThreshold = 8;
@@ -167,6 +173,32 @@ export const ChartCanvas = forwardRef<SVGSVGElement, ChartCanvasProps>(function 
         ) : null}
         {project.type === "waterfall" ? (
           <WaterfallChart
+            project={project}
+            selectedId={selectedId}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
+            onStartLabelDrag={startLabelDrag}
+            onUpdateOverride={onUpdateOverride}
+            onResetOverride={onResetOverride}
+            onResetLabelPosition={resetLabelPosition}
+            onAddElement={onAddElement}
+            onDeleteElement={onDeleteElement}
+          />
+        ) : null}
+        {project.type === "sankey" ? (
+          <SankeyChart
+            project={project}
+            selectedId={selectedId}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
+            onUpdateOverride={onUpdateOverride}
+            onResetOverride={onResetOverride}
+            onAddElement={onAddElement}
+            onDeleteElement={onDeleteElement}
+          />
+        ) : null}
+        {project.type === "scatter" ? (
+          <ScatterChart
             project={project}
             selectedId={selectedId}
             selectedIds={selectedIds}
@@ -961,6 +993,239 @@ function moveLabelPoint(point: LabelPoint, y: number) {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function SankeyChart({
+  project,
+  selectedId,
+  selectedIds,
+  onSelect,
+  onUpdateOverride,
+  onResetOverride,
+  onAddElement,
+  onDeleteElement
+}: {
+  project: ChartProject;
+  selectedId: string | null;
+  selectedIds: string[];
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
+  onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
+  onResetOverride: (id: string) => void;
+  onAddElement: (id: string) => void;
+  onDeleteElement: (id: string) => void;
+}) {
+  const ox = 90, oy = 70, w = 780, h = 390;
+  const data = project.data as SankeyData;
+  const layout = layoutSankey(data, project.theme.palette, project.visualOverrides, w, h, project.settings.sankey);
+  const selectedNode = selectedId ? layout.nodes.find((n) => n.id === selectedId) : null;
+
+  return (
+    <g transform={`translate(${ox} ${oy})`}>
+      {layout.links.map((link) => (
+        <path
+          key={link.id}
+          d={link.path}
+          fill={link.color}
+          opacity="0.28"
+          stroke="none"
+        />
+      ))}
+      {project.settings.sankey.showLinkLabels
+        ? layout.links.map((link) => (
+            <text key={`lbl-${link.id}`} x={link.midX} y={link.midY} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
+              {link.value}
+            </text>
+          ))
+        : null}
+      {layout.nodes.map((node) => {
+        const selected = selectedIds.includes(node.id);
+        return (
+          <g key={node.id}>
+            <rect
+              x={node.x}
+              y={node.y}
+              width={node.width}
+              height={node.height}
+              fill={node.color}
+              stroke={selected ? "#174f51" : "none"}
+              strokeWidth={selected ? 3 : 0}
+              rx="2"
+              className="selectable-mark"
+              onClick={(e) => { e.stopPropagation(); onSelect(node.id, { additive: e.shiftKey || e.metaKey || e.ctrlKey }); }}
+            />
+            {project.settings.sankey.showNodeLabels && node.labelVisible ? (
+              <text
+                x={node.x + node.width + 6}
+                y={node.y + node.height / 2 + 4}
+                textAnchor="start"
+                className="svg-axis"
+                fill={project.theme.foreground}
+              >
+                {node.label}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+      {selectedId && selectedNode ? (
+        <CanvasToolbar
+          id={selectedId}
+          x={clamp(selectedNode.x + selectedNode.width + 8, 0, w - toolbarWidth)}
+          y={clamp(selectedNode.y - 50, -56, h - 44)}
+          palette={project.theme.palette}
+          override={project.visualOverrides[selectedId] ?? {}}
+          onUpdateOverride={onUpdateOverride}
+          onResetOverride={onResetOverride}
+          onResetLabelPosition={() => {}}
+          onAddElement={onAddElement}
+          onDeleteElement={onDeleteElement}
+        />
+      ) : null}
+    </g>
+  );
+}
+
+function ScatterChart({
+  project,
+  selectedId,
+  selectedIds,
+  onSelect,
+  onStartLabelDrag,
+  onUpdateOverride,
+  onResetOverride,
+  onResetLabelPosition,
+  onAddElement,
+  onDeleteElement
+}: {
+  project: ChartProject;
+  selectedId: string | null;
+  selectedIds: string[];
+  onSelect: (id: string, options?: { additive?: boolean }) => void;
+  onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
+  onUpdateOverride: (id: string, next: Partial<VisualOverride>) => void;
+  onResetOverride: (id: string) => void;
+  onResetLabelPosition: (id: string) => void;
+  onAddElement: (id: string) => void;
+  onDeleteElement: (id: string) => void;
+}) {
+  const ox = 120, oy = 55, w = 700, h = 360;
+  const data = project.data as ScatterData;
+  const scatterSettings = project.settings.scatter;
+  const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);
+  const selectedPoint = selectedId ? layout.points.find((p) => p.id === selectedId) : null;
+  const midX = w / 2, midY = h / 2;
+
+  return (
+    <g transform={`translate(${ox} ${oy})`}>
+      <rect x="0" y="0" width={w} height={h} fill="transparent" stroke={project.theme.grid} strokeWidth="1" />
+
+      {scatterSettings.showGrid ? (
+        <g>
+          {layout.xTicks.map((tick) => (
+            <line key={`xg-${tick.value}`} x1={tick.position} x2={tick.position} y1="0" y2={h} stroke={project.theme.grid} strokeWidth="0.7" strokeDasharray="2 5" />
+          ))}
+          {layout.yTicks.map((tick) => (
+            <line key={`yg-${tick.value}`} x1="0" x2={w} y1={tick.position} y2={tick.position} stroke={project.theme.grid} strokeWidth="0.7" strokeDasharray="2 5" />
+          ))}
+        </g>
+      ) : null}
+
+      {scatterSettings.showQuadrants ? (
+        <g>
+          <line x1={midX} x2={midX} y1="0" y2={h} stroke={project.theme.grid} strokeWidth="1.5" strokeDasharray="6 4" />
+          <line x1="0" x2={w} y1={midY} y2={midY} stroke={project.theme.grid} strokeWidth="1.5" strokeDasharray="6 4" />
+          {(scatterSettings.quadrantLabels as string[]).map((qlabel, qi) => {
+            const qx = qi % 2 === 0 ? midX - 12 : midX + 12;
+            const qy = qi < 2 ? midY - 10 : midY + 14;
+            const anchor = qi % 2 === 0 ? "end" : "start";
+            return qlabel ? (
+              <text key={qi} x={qx} y={qy} textAnchor={anchor} className="svg-note" fill={project.theme.muted} opacity="0.7">
+                {qlabel}
+              </text>
+            ) : null;
+          })}
+        </g>
+      ) : null}
+
+      {layout.xTicks.map((tick) => (
+        <g key={`xt-${tick.value}`}>
+          <line x1={tick.position} x2={tick.position} y1={h} y2={h + 5} stroke={project.theme.grid} strokeWidth="1" />
+          <text x={tick.position} y={h + 18} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
+            {tick.label}
+          </text>
+        </g>
+      ))}
+      {layout.yTicks.map((tick) => (
+        <g key={`yt-${tick.value}`}>
+          <line x1="-5" x2="0" y1={tick.position} y2={tick.position} stroke={project.theme.grid} strokeWidth="1" />
+          <text x="-10" y={tick.position + 4} textAnchor="end" className="svg-axis" fill={project.theme.muted}>
+            {tick.label}
+          </text>
+        </g>
+      ))}
+
+      {scatterSettings.xLabel ? (
+        <text x={w / 2} y={h + 40} textAnchor="middle" className="svg-axis" fill={project.theme.foreground}>
+          {scatterSettings.xLabel}
+        </text>
+      ) : null}
+      {scatterSettings.yLabel ? (
+        <text x="-40" y={h / 2} textAnchor="middle" className="svg-axis" fill={project.theme.foreground} transform={`rotate(-90, -40, ${h / 2})`}>
+          {scatterSettings.yLabel}
+        </text>
+      ) : null}
+
+      {layout.points.map((point) => {
+        const selected = selectedIds.includes(point.id);
+        const offset = project.visualOverrides[point.id]?.labelOffset;
+        const labelX = point.cx + (offset?.dx ?? 0);
+        const labelY = point.cy - point.r - 6 + (offset?.dy ?? 0);
+        return (
+          <g key={point.id}>
+            <circle
+              cx={point.cx}
+              cy={point.cy}
+              r={point.r}
+              fill={point.color}
+              opacity="0.85"
+              stroke={selected ? "#174f51" : project.theme.background}
+              strokeWidth={selected ? 3 : 1.5}
+              className="selectable-mark"
+              onClick={(e) => { e.stopPropagation(); onSelect(point.id, { additive: e.shiftKey || e.metaKey || e.ctrlKey }); }}
+            />
+            {project.settings.showLabels && point.labelVisible ? (
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                className="svg-label label-handle"
+                fill={project.theme.foreground}
+                onPointerDown={(e) => onStartLabelDrag(point.id, e)}
+                onDoubleClick={(e) => { e.stopPropagation(); onResetLabelPosition(point.id); }}
+              >
+                {point.label}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+
+      {selectedId && selectedPoint ? (
+        <CanvasToolbar
+          id={selectedId}
+          x={clamp(selectedPoint.cx + selectedPoint.r + 8, 0, w - toolbarWidth)}
+          y={clamp(selectedPoint.cy - 50, -56, h - 44)}
+          palette={project.theme.palette}
+          override={project.visualOverrides[selectedId] ?? {}}
+          onUpdateOverride={onUpdateOverride}
+          onResetOverride={onResetOverride}
+          onResetLabelPosition={onResetLabelPosition}
+          onAddElement={onAddElement}
+          onDeleteElement={onDeleteElement}
+        />
+      ) : null}
+    </g>
+  );
 }
 
 function Legend({

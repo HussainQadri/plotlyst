@@ -1,6 +1,6 @@
 import { defaultTheme } from "./themes";
 import { defaultChartSettings } from "./labels";
-import type { ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
+import type { ChartProject, ChartType, MarimekkoData, PieData, SankeyData, ScatterData, WaterfallData } from "./types";
 
 export const samplePieData: PieData = {
   rows: [
@@ -55,23 +55,62 @@ export const sampleWaterfallData: WaterfallData = {
   ]
 };
 
+export const sampleSankeyData: SankeyData = {
+  nodes: [
+    { id: "sk-revenue", label: "Total Revenue" },
+    { id: "sk-product", label: "Product" },
+    { id: "sk-services", label: "Services" },
+    { id: "sk-americas", label: "Americas" },
+    { id: "sk-emea", label: "EMEA" },
+    { id: "sk-apac", label: "APAC" },
+    { id: "sk-svcs-americas", label: "Svcs Americas" },
+    { id: "sk-svcs-emea", label: "Svcs EMEA" }
+  ],
+  links: [
+    { id: "skl-1", sourceId: "sk-revenue", targetId: "sk-product", value: 74 },
+    { id: "skl-2", sourceId: "sk-revenue", targetId: "sk-services", value: 46 },
+    { id: "skl-3", sourceId: "sk-product", targetId: "sk-americas", value: 38 },
+    { id: "skl-4", sourceId: "sk-product", targetId: "sk-emea", value: 22 },
+    { id: "skl-5", sourceId: "sk-product", targetId: "sk-apac", value: 14 },
+    { id: "skl-6", sourceId: "sk-services", targetId: "sk-svcs-americas", value: 27 },
+    { id: "skl-7", sourceId: "sk-services", targetId: "sk-svcs-emea", value: 19 }
+  ]
+};
+
+export const sampleScatterData: ScatterData = {
+  points: [
+    { id: "sc-cloud", label: "Cloud Platform", x: 78, y: 24, size: 420 },
+    { id: "sc-security", label: "Security Suite", x: 62, y: 31, size: 210 },
+    { id: "sc-analytics", label: "Analytics", x: 45, y: 18, size: 175 },
+    { id: "sc-crm", label: "CRM", x: 55, y: 8, size: 310 },
+    { id: "sc-erp", label: "ERP", x: 32, y: 5, size: 480 },
+    { id: "sc-collab", label: "Collaboration", x: 68, y: 42, size: 155 },
+    { id: "sc-devtools", label: "Dev Tools", x: 81, y: 38, size: 90 },
+    { id: "sc-iot", label: "IoT Platform", x: 29, y: 47, size: 130 }
+  ]
+};
+
 export function createSampleProject(type: ChartType): ChartProject {
+  const data =
+    type === "pie" ? structuredClone(samplePieData)
+    : type === "marimekko" ? structuredClone(sampleMarimekkoData)
+    : type === "sankey" ? structuredClone(sampleSankeyData)
+    : type === "scatter" ? structuredClone(sampleScatterData)
+    : structuredClone(sampleWaterfallData);
+
+  const title =
+    type === "pie" ? "Revenue Mix"
+    : type === "marimekko" ? "Market Composition"
+    : type === "sankey" ? "Revenue Flow"
+    : type === "scatter" ? "Portfolio Analysis"
+    : "Revenue Bridge";
+
   return {
     id: `project-${type}`,
-    title:
-      type === "pie"
-        ? "Revenue Mix"
-        : type === "marimekko"
-          ? "Market Composition"
-          : "Revenue Bridge",
+    title,
     type,
     theme: defaultTheme,
-    data:
-      type === "pie"
-        ? structuredClone(samplePieData)
-        : type === "marimekko"
-          ? structuredClone(sampleMarimekkoData)
-          : structuredClone(sampleWaterfallData),
+    data,
     settings: defaultChartSettings(type),
     visualOverrides: {},
     annotations: []
