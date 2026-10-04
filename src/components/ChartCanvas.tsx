@@ -1043,6 +1043,8 @@ function SankeyChart({
   const data = project.data as SankeyData;
   const layout = layoutSankey(data, project.theme.palette, project.visualOverrides, w, h, project.settings.sankey);
   const selectedNode = selectedId ? layout.nodes.find((n) => n.id === selectedId) : null;
+  // Everything entering the diagram flows out of the first column, so it is the whole for Percent.
+  const totalFlow = layout.nodes.filter((node) => node.depth === 0).reduce((sum, node) => sum + node.value, 0);
 
   return (
     <g transform={`translate(${ox} ${oy})`}>
@@ -1066,6 +1068,16 @@ function SankeyChart({
         const selected = selectedIds.includes(node.id);
         // Right-half labels sit left of their node so they read into the flows, not off the slide.
         const labelOnLeft = node.x + node.width / 2 > w / 2;
+        const labelX = labelOnLeft ? node.x - 6 : node.x + node.width + 6;
+        const labelLines =
+          project.settings.sankey.showNodeLabels && node.labelVisible
+            ? buildLabelLines({
+                label: node.label,
+                value: node.value,
+                percentage: totalFlow > 0 ? node.value / totalFlow : undefined,
+                settings: project.settings
+              })
+            : [];
         return (
           <g key={node.id}>
             <rect
@@ -1080,15 +1092,19 @@ function SankeyChart({
               className="selectable-mark"
               onClick={(e) => { e.stopPropagation(); onSelect(node.id, { additive: e.shiftKey || e.metaKey || e.ctrlKey }); }}
             />
-            {project.settings.sankey.showNodeLabels && node.labelVisible ? (
+            {labelLines.length > 0 ? (
               <text
-                x={labelOnLeft ? node.x - 6 : node.x + node.width + 6}
-                y={node.y + node.height / 2 + 4}
+                x={labelX}
+                y={node.y + node.height / 2 + 4 - (labelLines.length - 1) * 7}
                 textAnchor={labelOnLeft ? "end" : "start"}
                 className="svg-axis"
                 fill={project.theme.foreground}
               >
-                {node.label}
+                {labelLines.map((line, index) => (
+                  <tspan key={`${line}-${index}`} x={labelX} dy={index === 0 ? 0 : 14}>
+                    {line}
+                  </tspan>
+                ))}
               </text>
             ) : null}
           </g>

@@ -31,7 +31,11 @@ const defaultValueFormat: NumberFormatSettings = {
 export function defaultLabelSettings(type: ChartType): LabelSettings {
   return {
     // The waterfall axis already names every bar, so its bar labels default to the value alone.
-    fields: type === "pie" ? ["label", "percent"] : type === "scatter" ? ["label"] : type === "waterfall" ? ["value"] : ["label", "value"],
+    fields:
+      type === "pie" ? ["label", "percent"]
+      : type === "scatter" || type === "sankey" ? ["label"]
+      : type === "waterfall" ? ["value"]
+      : ["label", "value"],
     separator: "space",
     valueFormat: {
       ...defaultValueFormat,

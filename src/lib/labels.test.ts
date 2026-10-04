@@ -38,6 +38,10 @@ describe("label formatting", () => {
     expect(defaultLabelSettings("waterfall").fields).toEqual(["value"]);
   });
 
+  it("defaults Sankey node labels to names", () => {
+    expect(defaultLabelSettings("sankey").fields).toEqual(["label"]);
+  });
+
   it("normalizes legacy showValues projects into label fields", () => {
     const hiddenValues = normalizeChartSettings({ showTitle: false, showLegend: true, showValues: false }, "waterfall");
     const visibleValues = normalizeChartSettings({ showValues: true }, "waterfall");
