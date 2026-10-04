@@ -425,7 +425,9 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
               </select>
             </label>
           </div>
-          <ToggleRow label="Plus on changes" checked={valueFormat.showPlus} onChange={() => updateValueFormat({ showPlus: !valueFormat.showPlus })} />
+          {project.type === "waterfall" ? (
+            <ToggleRow label="Plus on changes" checked={valueFormat.showPlus} onChange={() => updateValueFormat({ showPlus: !valueFormat.showPlus })} />
+          ) : null}
         </div>
 
         {project.type === "waterfall" ? (
