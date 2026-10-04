@@ -344,7 +344,7 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
         <div className="settings-block">
           <div className="subsection-label">Label content</div>
           <div className="toggle-stack">
-            {labelFields.map((field) => (
+            {labelFields.filter((field) => project.type !== "scatter" || field.id !== "percent").map((field) => (
               <ToggleRow
                 key={field.id}
                 label={field.label}
@@ -399,16 +399,18 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
               <span>Suffix</span>
               <input value={valueFormat.suffix} onChange={(event) => updateValueFormat({ suffix: event.target.value })} />
             </label>
-            <label className="field">
-              <span>Percent dp</span>
-              <input
-                type="number"
-                min="0"
-                max="2"
-                value={labelContent.percentDecimals}
-                onChange={(event) => updateLabelContent({ percentDecimals: Number(event.target.value) })}
-              />
-            </label>
+            {project.type !== "scatter" ? (
+              <label className="field">
+                <span>Percent dp</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="2"
+                  value={labelContent.percentDecimals}
+                  onChange={(event) => updateLabelContent({ percentDecimals: Number(event.target.value) })}
+                />
+              </label>
+            ) : null}
             <label className="field">
               <span>Negative</span>
               <select
