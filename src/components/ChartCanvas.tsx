@@ -263,6 +263,12 @@ function PieChart({
   const labelData = slices.map((slice) => {
     const mid = (slice.startAngle + slice.endAngle) / 2;
     const offset = project.visualOverrides[slice.id]?.labelOffset;
+    const lines = buildLabelLines({
+      label: slice.label,
+      percentage: slice.percentage,
+      value: slice.value,
+      settings: project.settings
+    });
     return {
       id: slice.id,
       point: pieLabelPoint({
@@ -274,14 +280,10 @@ function PieChart({
         placement: slice.labelPlacement,
         offset,
         foreground: project.theme.foreground,
-        fillColor: slice.color
+        fillColor: slice.color,
+        lines
       }),
-      lines: buildLabelLines({
-        label: slice.label,
-        percentage: slice.percentage,
-        value: slice.value,
-        settings: project.settings
-      }),
+      lines,
       manuallyPlaced: Boolean(offset && (offset.dx !== 0 || offset.dy !== 0))
     };
   });
@@ -302,7 +304,8 @@ function PieChart({
         percentage: selectedSlice.percentage,
         placement: "outside",
         foreground: project.theme.foreground,
-        fillColor: selectedSlice.color
+        fillColor: selectedSlice.color,
+        lines: []
       })
     : null;
 
@@ -609,6 +612,12 @@ function MarimekkoSegment({
   onStartLabelDrag: (id: string, event: React.PointerEvent<SVGTextElement>) => void;
   onResetLabelPosition: (id: string) => void;
 }) {
+  const labelLines = buildLabelLines({
+    label: segment.label,
+    value: segment.value,
+    percentage: showSegmentPercentages ? segment.segmentPercentage : segment.percentage,
+    settings
+  });
   const labelPoint = rectLabelPoint({
     rect: { x: segment.x, y: segment.y, width: segment.width, height: segment.height },
     placement: segment.labelPlacement,
@@ -616,13 +625,8 @@ function MarimekkoSegment({
     chartWidth,
     chartHeight,
     foreground: themeForeground,
-    fillColor: segment.color
-  });
-  const labelLines = buildLabelLines({
-    label: segment.label,
-    value: segment.value,
-    percentage: showSegmentPercentages ? segment.segmentPercentage : segment.percentage,
-    settings
+    fillColor: segment.color,
+    lines: labelLines
   });
 
   return (
@@ -776,7 +780,8 @@ function WaterfallBar({
     offset,
     positive: bar.endValue >= bar.startValue,
     foreground: themeForeground,
-    fillColor: bar.color
+    fillColor: bar.color,
+    lines: labelLines
   });
   return (
     <g>

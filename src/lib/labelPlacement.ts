@@ -20,6 +20,18 @@ type Rect = {
 
 const zeroOffset: Offset = { dx: 0, dy: 0 };
 
+// Estimates for 12–13px Inter; ChartLabel stacks lines 14px apart around `y`.
+const labelCharWidth = 7;
+const labelLineHeight = 14;
+
+/** Approximate rendered size of a label block, to decide whether it fits inside a mark. */
+export function labelBlockSize(lines: string[]): { width: number; height: number } {
+  return {
+    width: Math.max(0, ...lines.map((line) => line.length)) * labelCharWidth,
+    height: lines.length * labelLineHeight
+  };
+}
+
 export function pieLabelPoint({
   cx,
   cy,
@@ -29,7 +41,8 @@ export function pieLabelPoint({
   placement,
   offset = zeroOffset,
   foreground,
-  fillColor
+  fillColor,
+  lines
 }: {
   cx: number;
   cy: number;
@@ -41,10 +54,17 @@ export function pieLabelPoint({
   foreground: string;
   /** The slice's fill, which picks the ink for an inside label. */
   fillColor: string;
+  lines: string[];
 }): LabelPoint {
-  const effective = placement === "auto" ? (percentage >= 0.13 ? "inside" : "callout") : placement;
+  const insideRadius = radius * 0.58;
+  // The slice's chord at the label radius is the width an inside label can use.
+  const sweep = Math.min(percentage * 360, 180);
+  const chord = 2 * insideRadius * Math.sin((sweep / 2) * (Math.PI / 180));
+  const text = labelBlockSize(lines);
+  const fits = text.width + 8 <= chord && text.height + 8 <= 2 * (radius - insideRadius);
+  const effective = placement === "auto" ? (percentage >= 0.13 && fits ? "inside" : "callout") : placement;
   const inside = effective === "inside";
-  const labelRadius = inside ? radius * 0.58 : radius + 42;
+  const labelRadius = inside ? insideRadius : radius + 42;
   const label = polarToCartesian(cx, cy, labelRadius, midAngle);
   const leaderStart = polarToCartesian(cx, cy, radius + 8, midAngle);
   const x = label.x + offset.dx;
@@ -74,7 +94,8 @@ export function rectLabelPoint({
   chartWidth,
   chartHeight,
   foreground,
-  fillColor
+  fillColor,
+  lines
 }: {
   rect: Rect;
   placement: LabelPlacement;
@@ -84,9 +105,11 @@ export function rectLabelPoint({
   foreground: string;
   /** The rectangle's fill, which picks the ink for an inside label. */
   fillColor: string;
+  lines: string[];
 }): LabelPoint {
-  const largeEnough = rect.width >= 86 && rect.height >= 34;
-  const effective = placement === "auto" ? (largeEnough ? "inside" : "callout") : placement;
+  const text = labelBlockSize(lines);
+  const fits = text.width + 12 <= rect.width && text.height + 8 <= rect.height;
+  const effective = placement === "auto" ? (fits ? "inside" : "callout") : placement;
   const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 
   if (effective === "inside") {
@@ -119,7 +142,8 @@ export function waterfallLabelPoint({
   offset = zeroOffset,
   positive,
   foreground,
-  fillColor
+  fillColor,
+  lines
 }: {
   rect: Rect;
   placement: LabelPlacement;
@@ -128,9 +152,11 @@ export function waterfallLabelPoint({
   foreground: string;
   /** The bar's fill, which picks the ink for an inside label. */
   fillColor: string;
+  lines: string[];
 }): LabelPoint {
-  const largeEnough = rect.height >= 42 && rect.width >= 44;
-  const effective = placement === "auto" ? (largeEnough ? "inside" : "outside") : placement;
+  const text = labelBlockSize(lines);
+  const fits = text.width + 8 <= rect.width && text.height + 14 <= rect.height;
+  const effective = placement === "auto" ? (fits ? "inside" : "outside") : placement;
   const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 
   if (effective === "inside") {
@@ -175,10 +201,6 @@ export type ScatterLabelRequest = {
   offset?: Offset;
 };
 
-// Estimates for 12–13px Inter; ChartLabel stacks lines 14px apart around `y`.
-const scatterCharWidth = 7;
-const scatterLineHeight = 14;
-
 type ScatterCandidate = { x: number; y: number; anchor: LabelPoint["anchor"]; rect: Rect };
 
 /**
@@ -205,8 +227,7 @@ export function placeScatterLabels(
   requests.forEach((request) => {
     if (request.lines.length === 0) return;
     const offset = request.offset ?? zeroOffset;
-    const width = Math.max(...request.lines.map((line) => line.length)) * scatterCharWidth;
-    const height = request.lines.length * scatterLineHeight;
+    const { width, height } = labelBlockSize(request.lines);
     const insideRect = { x: request.cx - width / 2, y: request.cy - height / 2, width, height };
     // A label that fits but is half-buried under neighbouring bubbles reads worse than one outside.
     const coveredInside = bubbles.reduce(
@@ -268,7 +289,7 @@ export function placeScatterLabels(
 
 function scatterLabelCandidates(request: ScatterLabelRequest, width: number, lineCount: number, gap: number): ScatterCandidate[] {
   const { cx, cy, radius } = request;
-  const height = lineCount * scatterLineHeight;
+  const height = lineCount * labelLineHeight;
   // ChartLabel centres a block of lines on y - 3, so y = top + height / 2 + 3.
   const yForTop = (top: number) => top + height / 2 + 3;
   const diagonal = radius * Math.SQRT1_2 + gap * 0.5;

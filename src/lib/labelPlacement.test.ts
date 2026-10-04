@@ -11,7 +11,8 @@ describe("label placement", () => {
       percentage: 0.2,
       placement: "inside",
       foreground: "#111",
-      fillColor: "#327277"
+      fillColor: "#327277",
+      lines: ["Label 10%"]
     });
     const outside = pieLabelPoint({
       cx: 100,
@@ -21,7 +22,8 @@ describe("label placement", () => {
       percentage: 0.2,
       placement: "outside",
       foreground: "#111",
-      fillColor: "#327277"
+      fillColor: "#327277",
+      lines: ["Label 10%"]
     });
 
     expect(outside.x).toBeGreaterThan(inside.x);
@@ -34,7 +36,8 @@ describe("label placement", () => {
       chartWidth: 500,
       chartHeight: 300,
       foreground: "#111",
-      fillColor: "#327277"
+      fillColor: "#327277",
+      lines: ["Label 10%"]
     });
 
     expect(point.leader).toBeDefined();
@@ -43,12 +46,24 @@ describe("label placement", () => {
 
   it("inks inside labels by the fill so they read on light and dark marks", () => {
     const rect = { x: 0, y: 0, width: 200, height: 80 };
-    const onDark = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#327277" });
-    const onLight = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#f2c14e" });
+    const onDark = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#327277", lines: ["Software 56"] });
+    const onLight = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#f2c14e", lines: ["Software 56"] });
 
     expect(onDark.fill).toBe("#ffffff");
     expect(onLight.fill).toBe("#171717");
     expect(onLight.className).toContain("ink");
+  });
+
+  it("moves auto labels outside marks they don't fit inside", () => {
+    const wide = ["2025 Revenue 128"];
+    const narrowBar = waterfallLabelPoint({ rect: { x: 0, y: 100, width: 80, height: 200 }, placement: "auto", positive: true, foreground: "#111", fillColor: "#327277", lines: wide });
+    const wideBar = waterfallLabelPoint({ rect: { x: 0, y: 100, width: 140, height: 200 }, placement: "auto", positive: true, foreground: "#111", fillColor: "#327277", lines: wide });
+    const thinSlice = pieLabelPoint({ cx: 0, cy: 0, radius: 142, midAngle: 0, percentage: 0.15, placement: "auto", foreground: "#111", fillColor: "#327277", lines: ["Professional services 15%"] });
+
+    expect(narrowBar.y).toBeLessThan(100);
+    expect(narrowBar.className).toBe("svg-label");
+    expect(wideBar.className).toContain("light");
+    expect(thinSlice.leader).toBeDefined();
   });
 
   it("places waterfall outside labels above positive and below negative bars", () => {
@@ -57,14 +72,16 @@ describe("label placement", () => {
       placement: "outside",
       positive: true,
       foreground: "#111",
-      fillColor: "#327277"
+      fillColor: "#327277",
+      lines: ["Label 10%"]
     });
     const negative = waterfallLabelPoint({
       rect: { x: 40, y: 120, width: 60, height: 12 },
       placement: "outside",
       positive: false,
       foreground: "#111",
-      fillColor: "#327277"
+      fillColor: "#327277",
+      lines: ["Label 10%"]
     });
 
     expect(positive.y).toBeLessThan(120);
