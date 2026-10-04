@@ -29,7 +29,7 @@ export function pieLabelPoint({
   placement,
   offset = zeroOffset,
   foreground,
-  lightFill = "#ffffff"
+  fillColor
 }: {
   cx: number;
   cy: number;
@@ -39,7 +39,8 @@ export function pieLabelPoint({
   placement: LabelPlacement;
   offset?: Offset;
   foreground: string;
-  lightFill?: string;
+  /** The slice's fill, which picks the ink for an inside label. */
+  fillColor: string;
 }): LabelPoint {
   const effective = placement === "auto" ? (percentage >= 0.13 ? "inside" : "callout") : placement;
   const inside = effective === "inside";
@@ -53,8 +54,7 @@ export function pieLabelPoint({
     x,
     y,
     anchor: inside ? "middle" : x > cx ? "start" : "end",
-    fill: inside ? lightFill : foreground,
-    className: inside ? "svg-label light" : "svg-label",
+    ...(inside ? insideLabelInk(fillColor) : { fill: foreground, className: "svg-label" }),
     leader:
       effective === "callout"
         ? {
@@ -74,7 +74,7 @@ export function rectLabelPoint({
   chartWidth,
   chartHeight,
   foreground,
-  lightFill = "#ffffff"
+  fillColor
 }: {
   rect: Rect;
   placement: LabelPlacement;
@@ -82,7 +82,8 @@ export function rectLabelPoint({
   chartWidth: number;
   chartHeight: number;
   foreground: string;
-  lightFill?: string;
+  /** The rectangle's fill, which picks the ink for an inside label. */
+  fillColor: string;
 }): LabelPoint {
   const largeEnough = rect.width >= 86 && rect.height >= 34;
   const effective = placement === "auto" ? (largeEnough ? "inside" : "callout") : placement;
@@ -93,8 +94,7 @@ export function rectLabelPoint({
       x: center.x + offset.dx,
       y: center.y + 4 + offset.dy,
       anchor: "middle",
-      fill: lightFill,
-      className: "svg-label light"
+      ...insideLabelInk(fillColor)
     };
   }
 
@@ -119,14 +119,15 @@ export function waterfallLabelPoint({
   offset = zeroOffset,
   positive,
   foreground,
-  lightFill = "#ffffff"
+  fillColor
 }: {
   rect: Rect;
   placement: LabelPlacement;
   offset?: Offset;
   positive: boolean;
   foreground: string;
-  lightFill?: string;
+  /** The bar's fill, which picks the ink for an inside label. */
+  fillColor: string;
 }): LabelPoint {
   const largeEnough = rect.height >= 42 && rect.width >= 44;
   const effective = placement === "auto" ? (largeEnough ? "inside" : "outside") : placement;
@@ -137,8 +138,7 @@ export function waterfallLabelPoint({
       x: center.x + offset.dx,
       y: center.y + 4 + offset.dy,
       anchor: "middle",
-      fill: lightFill,
-      className: "svg-label light"
+      ...insideLabelInk(fillColor)
     };
   }
 
@@ -216,14 +216,11 @@ export function placeScatterLabels(
     const fitsInside = Math.hypot(width / 2 + 4, height / 2 + 2) <= request.radius && coveredInside <= width * height * 0.15;
 
     if (request.placement === "inside" || (request.placement === "auto" && fitsInside)) {
-      const darkFill = isDarkColor(request.color);
       result.set(request.id, {
         x: request.cx + offset.dx,
         y: request.cy + 4 + offset.dy,
         anchor: "middle",
-        // Ink depends on the bubble, not the slide: a dark theme's light foreground vanishes on yellow.
-        fill: darkFill ? "#ffffff" : "#171717",
-        className: darkFill ? "svg-label light" : "svg-label ink"
+        ...insideLabelInk(request.color)
       });
       return;
     }
@@ -298,6 +295,15 @@ function overlapArea(a: Rect, b: Rect): number {
   const width = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
   const height = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
   return width > 0 && height > 0 ? width * height : 0;
+}
+
+/**
+ * Ink for a label set inside a filled mark: white on dark fills, near-black on
+ * light ones. It depends on the mark, not the slide, since a dark theme's light
+ * foreground would vanish on a yellow fill.
+ */
+export function insideLabelInk(fillColor: string): Pick<LabelPoint, "fill" | "className"> {
+  return isDarkColor(fillColor) ? { fill: "#ffffff", className: "svg-label light" } : { fill: "#171717", className: "svg-label ink" };
 }
 
 /** True when white text reads better than near-black on this fill (WCAG luminance crossover). */

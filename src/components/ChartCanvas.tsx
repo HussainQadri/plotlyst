@@ -273,7 +273,8 @@ function PieChart({
         percentage: slice.percentage,
         placement: slice.labelPlacement,
         offset,
-        foreground: project.theme.foreground
+        foreground: project.theme.foreground,
+        fillColor: slice.color
       }),
       lines: buildLabelLines({
         label: slice.label,
@@ -300,7 +301,8 @@ function PieChart({
         midAngle: (selectedSlice.startAngle + selectedSlice.endAngle) / 2,
         percentage: selectedSlice.percentage,
         placement: "outside",
-        foreground: project.theme.foreground
+        foreground: project.theme.foreground,
+        fillColor: selectedSlice.color
       })
     : null;
 
@@ -613,7 +615,8 @@ function MarimekkoSegment({
     offset,
     chartWidth,
     chartHeight,
-    foreground: themeForeground
+    foreground: themeForeground,
+    fillColor: segment.color
   });
   const labelLines = buildLabelLines({
     label: segment.label,
@@ -772,7 +775,8 @@ function WaterfallBar({
     placement: bar.labelPlacement,
     offset,
     positive: bar.endValue >= bar.startValue,
-    foreground: themeForeground
+    foreground: themeForeground,
+    fillColor: bar.color
   });
   return (
     <g>

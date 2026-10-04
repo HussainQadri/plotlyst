@@ -10,7 +10,8 @@ describe("label placement", () => {
       midAngle: 90,
       percentage: 0.2,
       placement: "inside",
-      foreground: "#111"
+      foreground: "#111",
+      fillColor: "#327277"
     });
     const outside = pieLabelPoint({
       cx: 100,
@@ -19,7 +20,8 @@ describe("label placement", () => {
       midAngle: 90,
       percentage: 0.2,
       placement: "outside",
-      foreground: "#111"
+      foreground: "#111",
+      fillColor: "#327277"
     });
 
     expect(outside.x).toBeGreaterThan(inside.x);
@@ -31,11 +33,22 @@ describe("label placement", () => {
       placement: "auto",
       chartWidth: 500,
       chartHeight: 300,
-      foreground: "#111"
+      foreground: "#111",
+      fillColor: "#327277"
     });
 
     expect(point.leader).toBeDefined();
     expect(point.x).toBeGreaterThan(52);
+  });
+
+  it("inks inside labels by the fill so they read on light and dark marks", () => {
+    const rect = { x: 0, y: 0, width: 200, height: 80 };
+    const onDark = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#327277" });
+    const onLight = rectLabelPoint({ rect, placement: "inside", chartWidth: 400, chartHeight: 300, foreground: "#f5f5f5", fillColor: "#f2c14e" });
+
+    expect(onDark.fill).toBe("#ffffff");
+    expect(onLight.fill).toBe("#171717");
+    expect(onLight.className).toContain("ink");
   });
 
   it("places waterfall outside labels above positive and below negative bars", () => {
@@ -43,13 +56,15 @@ describe("label placement", () => {
       rect: { x: 40, y: 120, width: 60, height: 12 },
       placement: "outside",
       positive: true,
-      foreground: "#111"
+      foreground: "#111",
+      fillColor: "#327277"
     });
     const negative = waterfallLabelPoint({
       rect: { x: 40, y: 120, width: 60, height: 12 },
       placement: "outside",
       positive: false,
-      foreground: "#111"
+      foreground: "#111",
+      fillColor: "#327277"
     });
 
     expect(positive.y).toBeLessThan(120);
