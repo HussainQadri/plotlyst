@@ -1,7 +1,7 @@
 "use client";
 
 import { Columns3, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { NumberField } from "./ui/NumberField";
 import { useFocusTrap } from "./ui/useFocusTrap";
 import {
@@ -38,14 +38,15 @@ type CellPosition = {
 export function DatasheetModal({ project, setProject, setSelectedId, onClose }: DatasheetModalProps) {
   const dialogRef = useFocusTrap<HTMLElement>(true);
 
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  // Escape is handled on the dialog rather than window: a window listener
+  // re-subscribes whenever onClose changes identity, and a re-render in the
+  // middle of a keypress drops it before it runs.
+  function closeOnEscape(event: React.KeyboardEvent) {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+  }
 
   return (
     <div className="datasheet-overlay" role="presentation" onMouseDown={onClose}>
@@ -55,6 +56,9 @@ export function DatasheetModal({ project, setProject, setSelectedId, onClose }: 
         role="dialog"
         aria-modal="true"
         aria-label={`${project.type} datasheet`}
+        // Focusable so clicking the dialog's plain text keeps focus (and Escape) inside it.
+        tabIndex={-1}
+        onKeyDown={closeOnEscape}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="datasheet-header">

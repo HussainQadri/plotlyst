@@ -692,10 +692,12 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
       if (mod && key.toLowerCase() === "k") {
         event.preventDefault();
-        setPaletteOpen((current) => !current);
+        if (!datasheetOpen) setPaletteOpen((current) => !current);
         return;
       }
 
+      // An open modal owns the keyboard; nothing may edit the chart behind it.
+      if (datasheetOpen || paletteOpen) return;
       if (editing) return;
 
       if (mod && key.toLowerCase() === "z") {
@@ -756,7 +758,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [deleteAnnotation, deleteElement, nudgeSelection, redo, selectedAnnotation, selectedElement, selectedId, toggleLeftPanel, toggleRightPanel, undo]);
+  }, [datasheetOpen, deleteAnnotation, deleteElement, nudgeSelection, paletteOpen, redo, selectedAnnotation, selectedElement, selectedId, toggleLeftPanel, toggleRightPanel, undo]);
 
   const overflowItems: MenuItem[] = [
     { kind: "heading", id: "h-data", label: "Data" },
