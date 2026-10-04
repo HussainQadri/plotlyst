@@ -149,4 +149,15 @@ describe("chart layout math", () => {
     expect(layout.xDivider).not.toBe(350);
     expect(layout.yDivider).not.toBe(180);
   });
+
+  it("keeps a scatter point's colour when an earlier point becomes invalid", () => {
+    const before = layoutScatter(sampleScatterData, defaultTheme.palette);
+    const after = layoutScatter(
+      { points: sampleScatterData.points.map((point, index) => (index === 0 ? { ...point, x: Number.NaN } : point)) },
+      defaultTheme.palette
+    );
+
+    expect(after.points[0].id).toBe(before.points[1].id);
+    expect(after.points[0].color).toBe(before.points[1].color);
+  });
 });

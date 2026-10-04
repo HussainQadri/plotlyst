@@ -595,7 +595,9 @@ export function layoutScatter(
   height = 360,
   settings: ScatterSettings = defaultScatterSettings()
 ): ScatterLayout {
-  const pts = data.points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const pts = data.points.flatMap((point, sourceIndex) =>
+    Number.isFinite(point.x) && Number.isFinite(point.y) ? [{ point, sourceIndex }] : []
+  );
 
   if (pts.length === 0) {
     return {
@@ -611,8 +613,8 @@ export function layoutScatter(
     };
   }
 
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
+  const xs = pts.map(({ point }) => point.x);
+  const ys = pts.map(({ point }) => point.y);
   const xS = niceScale(Math.min(...xs), Math.max(...xs), 5);
   const yS = niceScale(Math.min(...ys), Math.max(...ys), 5);
 
@@ -621,22 +623,22 @@ export function layoutScatter(
   const scaleX = (x: number) => ((x - xS.min) / xRange) * width;
   const scaleY = (y: number) => height - ((y - yS.min) / yRange) * height;
 
-  const maxSz = Math.max(...pts.map((p) => (settings.showBubbles ? (p.size ?? 0) : 0)), 1);
+  const maxSz = Math.max(...pts.map(({ point }) => (settings.showBubbles ? (point.size ?? 0) : 0)), 1);
   const maxR = 38;
   const getR = (size?: number) => (!settings.showBubbles || !size || size <= 0 ? 7 : Math.max(4, Math.sqrt(size / maxSz) * maxR));
 
-  const points: ScatterPointLayout[] = pts.map((p, i) => {
-    const ov = getOverride(overrides, p.id);
+  const points: ScatterPointLayout[] = pts.map(({ point, sourceIndex }) => {
+    const ov = getOverride(overrides, point.id);
     return {
-      id: p.id,
-      label: resolveLabel(p.label, ov),
-      cx: scaleX(p.x),
-      cy: scaleY(p.y),
-      r: getR(p.size),
-      color: resolveColor(palette[i % palette.length], p.color, ov),
-      x: p.x,
-      y: p.y,
-      size: p.size ?? 0,
+      id: point.id,
+      label: resolveLabel(point.label, ov),
+      cx: scaleX(point.x),
+      cy: scaleY(point.y),
+      r: getR(point.size),
+      color: resolveColor(palette[sourceIndex % palette.length] ?? "#327277", point.color, ov),
+      x: point.x,
+      y: point.y,
+      size: point.size ?? 0,
       labelVisible: resolveLabelVisible(ov),
       labelPlacement: resolveLabelPlacement(ov, "auto")
     };
