@@ -587,6 +587,10 @@ export type ScatterLayout = {
   yDivider: number;
 };
 
+const scatterDotRadius = 6;
+const scatterMinBubbleRadius = 5;
+const scatterMaxBubbleRadius = 30;
+
 export function layoutScatter(
   data: ScatterData,
   palette: string[],
@@ -623,9 +627,13 @@ export function layoutScatter(
   const scaleX = (x: number) => ((x - xS.min) / xRange) * width;
   const scaleY = (y: number) => height - ((y - yS.min) / yRange) * height;
 
-  const maxSz = Math.max(...pts.map(({ point }) => (settings.showBubbles ? (point.size ?? 0) : 0)), 1);
-  const maxR = 38;
-  const getR = (size?: number) => (!settings.showBubbles || !size || size <= 0 ? 7 : Math.max(4, Math.sqrt(size / maxSz) * maxR));
+  // Bubble area, not radius, is proportional to size so big values aren't exaggerated.
+  const maxSize = Math.max(...pts.map(({ point }) => finitePositive(point.size)), 0);
+  const getRadius = (size?: number) => {
+    const safeSize = finitePositive(size);
+    if (!settings.showBubbles || safeSize === 0 || maxSize === 0) return scatterDotRadius;
+    return Math.max(scatterMinBubbleRadius, Math.sqrt(safeSize / maxSize) * scatterMaxBubbleRadius);
+  };
 
   const points: ScatterPointLayout[] = pts.map(({ point, sourceIndex }) => {
     const ov = getOverride(overrides, point.id);
@@ -634,11 +642,11 @@ export function layoutScatter(
       label: resolveLabel(point.label, ov),
       cx: scaleX(point.x),
       cy: scaleY(point.y),
-      r: getR(point.size),
+      r: getRadius(point.size),
       color: resolveColor(palette[sourceIndex % palette.length] ?? "#327277", point.color, ov),
       x: point.x,
       y: point.y,
-      size: point.size ?? 0,
+      size: finitePositive(point.size),
       labelVisible: resolveLabelVisible(ov),
       labelPlacement: resolveLabelPlacement(ov, "auto")
     };
@@ -653,6 +661,10 @@ export function layoutScatter(
     xDivider: scaleX(clampToDomain(settings.xDivider ?? (xS.min + xS.max) / 2, xS.min, xS.max)),
     yDivider: scaleY(clampToDomain(settings.yDivider ?? (yS.min + yS.max) / 2, yS.min, yS.max))
   };
+}
+
+function finitePositive(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 function clampToDomain(value: number, min: number, max: number): number {

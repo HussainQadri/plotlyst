@@ -142,10 +142,24 @@ describe("chart layout math", () => {
     expect(layout.xTicks.some((tick) => tick.label !== "0")).toBe(true);
   });
 
-  it("places configurable quadrant dividers", () => {
+  it("uses safe sizes and configurable quadrant dividers", () => {
     const settings = { ...defaultScatterSettings(), showQuadrants: true, xDivider: 70, yDivider: 20 };
-    const layout = layoutScatter(sampleScatterData, defaultTheme.palette, {}, 700, 360, settings);
+    const layout = layoutScatter(
+      {
+        points: sampleScatterData.points.map((point, index) => ({
+          ...point,
+          size: index === 0 ? Number.POSITIVE_INFINITY : point.size
+        }))
+      },
+      defaultTheme.palette,
+      {},
+      700,
+      360,
+      settings
+    );
 
+    expect(layout.points.every((point) => Number.isFinite(point.r))).toBe(true);
+    expect(layout.points[0].size).toBe(0);
     expect(layout.xDivider).not.toBe(350);
     expect(layout.yDivider).not.toBe(180);
   });
