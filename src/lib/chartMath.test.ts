@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutMarimekko, layoutPie, layoutWaterfall } from "./chartMath";
+import { layoutMarimekko, layoutPie, layoutScatter, layoutWaterfall } from "./chartMath";
 import { defaultWaterfallSettings } from "./labels";
 import { sampleMarimekkoData, samplePieData, sampleWaterfallData } from "./samples";
 import { defaultTheme } from "./themes";
@@ -125,5 +125,20 @@ describe("chart layout math", () => {
     expect(expansion?.connectorInY).toBe(expansion?.startY);
     expect(expansion?.connectorOutY).toBe(expansion?.endY);
     expect(subtotal?.connectorInY).toBe(subtotal?.endY);
+  });
+
+  it("formats small scatter ticks without collapsing distinct values", () => {
+    const layout = layoutScatter(
+      {
+        points: [
+          { id: "a", label: "A", x: 0.001, y: 0.002 },
+          { id: "b", label: "B", x: 0.0018, y: 0.0028 }
+        ]
+      },
+      defaultTheme.palette
+    );
+
+    expect(new Set(layout.xTicks.map((tick) => tick.label)).size).toBe(layout.xTicks.length);
+    expect(layout.xTicks.some((tick) => tick.label !== "0")).toBe(true);
   });
 });

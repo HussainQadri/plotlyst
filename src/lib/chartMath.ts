@@ -641,11 +641,12 @@ export function layoutScatter(
 
 function niceAxisTicks(min: number, max: number, step: number, size: number, isX: boolean): ScatterAxisTick[] {
   const ticks: ScatterAxisTick[] = [];
+  if (!Number.isFinite(step) || step <= 0) return ticks;
   const range = max - min || 1;
   const scale = (v: number) => isX ? ((v - min) / range) * size : size - ((v - min) / range) * size;
-  for (let v = min; v <= max + step * 0.01; v = roundStepped(v + step)) {
+  for (let v = min, count = 0; v <= max + step * 0.01 && count < 100; v = roundStepped(v + step), count += 1) {
     if (v > max + step * 0.1) break;
-    ticks.push({ value: v, position: scale(v), label: formatTickLabel(v) });
+    ticks.push({ value: v, position: scale(v), label: formatTickLabel(v, step) });
   }
   return ticks;
 }
@@ -657,7 +658,7 @@ function niceScale(rawMin: number, rawMax: number, maxTicks: number): { min: num
     return { min: rawMin - step * 2, max: rawMax + step * 2, step };
   }
   const range = niceNumber(rawMax - rawMin, false);
-  const step = Math.max(niceNumber(range / maxTicks, true), 1e-10);
+  const step = niceNumber(range / maxTicks, true) || Math.max(Math.abs(rawMin), Math.abs(rawMax), 1) / maxTicks;
   return { min: Math.floor(rawMin / step) * step, max: Math.ceil(rawMax / step) * step, step };
 }
 
@@ -671,14 +672,24 @@ function niceNumber(value: number, round: boolean): number {
   return nf * Math.pow(10, exp);
 }
 
-function formatTickLabel(v: number): string {
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+function formatTickLabel(value: number, step: number): string {
+  const v = Object.is(value, -0) || Math.abs(value) < Math.abs(step) * 1e-10 ? 0 : value;
+  const absolute = Math.abs(v);
+  if (absolute >= 1e12) return `${trimFixed(v / 1e12, 1)}T`;
+  if (absolute >= 1e9) return `${trimFixed(v / 1e9, 1)}B`;
+  if (absolute >= 1e6) return `${trimFixed(v / 1e6, 1)}M`;
+  if (absolute >= 1e3) return `${trimFixed(v / 1e3, 1)}k`;
+  if (absolute > 0 && absolute < 1e-6) return v.toExponential(1);
+  const decimals = Math.min(8, Math.max(0, -Math.floor(Math.log10(Math.abs(step)))));
+  return trimFixed(v, decimals);
+}
+
+function trimFixed(value: number, decimals: number): string {
+  return value.toFixed(decimals).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
 }
 
 function roundStepped(v: number): number {
-  return Math.round(v * 1e10) / 1e10;
+  return Number(v.toPrecision(14));
 }
 
 export function polarToCartesian(cx: number, cy: number, radius: number, angleInDegrees: number) {
