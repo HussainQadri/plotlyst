@@ -1057,10 +1057,10 @@ function SankeyChart({
           stroke="none"
         />
       ))}
-      {project.settings.sankey.showLinkLabels
+      {project.settings.showLabels && project.settings.sankey.showLinkLabels
         ? layout.links.map((link) => (
             <text key={`lbl-${link.id}`} x={link.midX} y={link.midY} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
-              {link.value}
+              {formatValue(link.value, project.settings.labelContent.valueFormat)}
             </text>
           ))
         : null}
