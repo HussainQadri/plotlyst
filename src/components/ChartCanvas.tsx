@@ -1108,14 +1108,14 @@ function ScatterChart({
   const { x: ox, y: oy, width: w, height: h } = scatterPlotFrame;
   const data = project.data as ScatterData;
   const scatterSettings = project.settings.scatter;
-  const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);
+  const theme = project.theme;
+  const layout = layoutScatter(data, theme.palette, project.visualOverrides, w, h, scatterSettings);
   const selectedPoint = selectedId ? layout.points.find((p) => p.id === selectedId) : null;
   // Big bubbles paint first so small ones on top stay clickable; the selection paints last.
   const orderedPoints = [...layout.points].sort((a, b) => {
     const selectionOrder = Number(selectedIds.includes(a.id)) - Number(selectedIds.includes(b.id));
     return selectionOrder || b.r - a.r;
   });
-  const midX = layout.xDivider, midY = layout.yDivider;
   const labelLines = new Map(
     layout.points.map((point) => [point.id, buildLabelLines({ label: point.label, value: point.size, settings: project.settings })])
   );
@@ -1133,77 +1133,79 @@ function ScatterChart({
         offset: project.visualOverrides[point.id]?.labelOffset
       })),
     { width: w, height: h },
-    project.theme.foreground
+    theme.foreground
   );
+  const yTickLabelWidth = Math.max(0, ...layout.yTicks.map((tick) => tick.label.length * 7));
   const describePoint = (point: (typeof layout.points)[number]) =>
     `${point.label}: X ${point.x}, Y ${point.y}${scatterSettings.showBubbles && point.size ? `, size ${point.size}` : ""}`;
 
   return (
     <g transform={`translate(${ox} ${oy})`}>
-      <rect x="0" y="0" width={w} height={h} fill="transparent" stroke={project.theme.grid} strokeWidth="1" />
-
       {scatterSettings.showGrid ? (
-        <g>
+        <g aria-hidden="true" stroke={theme.grid} strokeWidth="1" opacity="0.6">
           {layout.xTicks.map((tick) => (
-            <line key={`xg-${tick.value}`} x1={tick.position} x2={tick.position} y1="0" y2={h} stroke={project.theme.grid} strokeWidth="0.7" strokeDasharray="2 5" />
+            <line key={`xg-${tick.value}`} x1={tick.position} x2={tick.position} y1="0" y2={h} />
           ))}
           {layout.yTicks.map((tick) => (
-            <line key={`yg-${tick.value}`} x1="0" x2={w} y1={tick.position} y2={tick.position} stroke={project.theme.grid} strokeWidth="0.7" strokeDasharray="2 5" />
+            <line key={`yg-${tick.value}`} x1="0" x2={w} y1={tick.position} y2={tick.position} />
           ))}
         </g>
       ) : null}
 
+      <g aria-hidden="true" stroke={theme.grid} strokeWidth="1">
+        <line x1="0" x2={w} y1={h} y2={h} />
+        <line x1="0" x2="0" y1="0" y2={h} />
+      </g>
+
       {scatterSettings.showQuadrants ? (
-        <g>
-          <line x1={midX} x2={midX} y1="0" y2={h} stroke={project.theme.grid} strokeWidth="1.5" strokeDasharray="6 4" />
-          <line x1="0" x2={w} y1={midY} y2={midY} stroke={project.theme.grid} strokeWidth="1.5" strokeDasharray="6 4" />
-          {(scatterSettings.quadrantLabels as string[]).map((qlabel, qi) => {
-            const qx = qi % 2 === 0 ? midX - 12 : midX + 12;
-            const qy = qi < 2 ? midY - 10 : midY + 14;
-            const anchor = qi % 2 === 0 ? "end" : "start";
-            return qlabel ? (
-              <text key={qi} x={qx} y={qy} textAnchor={anchor} className="svg-note" fill={project.theme.muted} opacity="0.7">
+        <g aria-hidden="true">
+          <line x1={layout.xDivider} x2={layout.xDivider} y1="0" y2={h} stroke={theme.muted} strokeWidth="1" strokeDasharray="5 4" opacity="0.6" />
+          <line x1="0" x2={w} y1={layout.yDivider} y2={layout.yDivider} stroke={theme.muted} strokeWidth="1" strokeDasharray="5 4" opacity="0.6" />
+          {scatterSettings.quadrantLabels.map((qlabel, qi) =>
+            qlabel ? (
+              <text
+                key={qi}
+                x={qi % 2 === 0 ? 10 : w - 10}
+                y={qi < 2 ? 18 : h - 10}
+                textAnchor={qi % 2 === 0 ? "start" : "end"}
+                className="svg-note"
+                fill={theme.muted}
+              >
                 {qlabel}
               </text>
-            ) : null;
-          })}
+            ) : null
+          )}
         </g>
       ) : null}
 
       {layout.xTicks.map((tick) => (
-        <g key={`xt-${tick.value}`}>
-          <line x1={tick.position} x2={tick.position} y1={h} y2={h + 5} stroke={project.theme.grid} strokeWidth="1" />
-          <text x={tick.position} y={h + 18} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
-            {tick.label}
-          </text>
-        </g>
+        <text key={`xt-${tick.value}`} x={tick.position} y={h + 20} textAnchor="middle" className="svg-axis" fill={theme.muted}>
+          {tick.label}
+        </text>
       ))}
       {layout.yTicks.map((tick) => (
-        <g key={`yt-${tick.value}`}>
-          <line x1="-5" x2="0" y1={tick.position} y2={tick.position} stroke={project.theme.grid} strokeWidth="1" />
-          <text x="-10" y={tick.position + 4} textAnchor="end" className="svg-axis" fill={project.theme.muted}>
-            {tick.label}
-          </text>
-        </g>
+        <text key={`yt-${tick.value}`} x="-10" y={tick.position + 4} textAnchor="end" className="svg-axis" fill={theme.muted}>
+          {tick.label}
+        </text>
       ))}
 
       {scatterSettings.xLabel ? (
-        <text x={w / 2} y={h + 40} textAnchor="middle" className="svg-axis" fill={project.theme.foreground}>
+        <text x={w / 2} y={h + 42} textAnchor="middle" className="svg-note" fill={theme.foreground}>
           {scatterSettings.xLabel}
         </text>
       ) : null}
       {scatterSettings.yLabel ? (
-        <text x="-40" y={h / 2} textAnchor="middle" className="svg-axis" fill={project.theme.foreground} transform={`rotate(-90, -40, ${h / 2})`}>
+        <text x={-10 - yTickLabelWidth} y="-16" textAnchor="start" className="svg-note" fill={theme.foreground}>
           {scatterSettings.yLabel}
         </text>
       ) : null}
 
       {layout.points.length === 0 ? (
         <g aria-hidden="true">
-          <text x={w / 2} y={h / 2 - 4} textAnchor="middle" className="svg-note" fill={project.theme.foreground}>
+          <text x={w / 2} y={h / 2 - 4} textAnchor="middle" className="svg-note" fill={theme.foreground}>
             {data.points.length === 0 ? "Add points to begin" : "Enter numeric X and Y values"}
           </text>
-          <text x={w / 2} y={h / 2 + 17} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
+          <text x={w / 2} y={h / 2 + 17} textAnchor="middle" className="svg-axis" fill={theme.muted}>
             Use the data panel or open the datasheet.
           </text>
         </g>
@@ -1219,9 +1221,9 @@ function ScatterChart({
               cy={point.cy}
               r={point.r}
               fill={point.color}
-              opacity="0.85"
-              stroke={selected ? "#174f51" : project.theme.background}
-              strokeWidth={selected ? 3 : 1.5}
+              fillOpacity={scatterSettings.showBubbles ? 0.85 : 1}
+              stroke={selected ? "#174f51" : theme.background}
+              strokeWidth={selected ? 3 : 2}
               className="selectable-mark"
               role="button"
               tabIndex={0}
@@ -1253,7 +1255,7 @@ function ScatterChart({
               id={point.id}
               lines={lines}
               point={labelPoint}
-              muted={project.theme.muted}
+              muted={theme.muted}
               selected={selectedIds.includes(point.id)}
               onStartDrag={onStartLabelDrag}
               onResetPosition={onResetLabelPosition}
@@ -1267,7 +1269,7 @@ function ScatterChart({
           id={selectedId}
           x={clamp(selectedPoint.cx + selectedPoint.r + 8, 0, w - toolbarWidth)}
           y={clamp(selectedPoint.cy - 50, -56, h - 44)}
-          palette={project.theme.palette}
+          palette={theme.palette}
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
           onResetOverride={onResetOverride}
