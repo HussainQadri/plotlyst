@@ -38,11 +38,13 @@ import { Inspector } from "./Inspector";
 import { CommandPalette, type Command as PaletteCommand } from "./ui/CommandPalette";
 import { Menu, type MenuItem } from "./ui/Menu";
 import { ToastRegion, useToasts } from "./ui/Toaster";
+import { useApplePlatform } from "./ui/useApplePlatform";
 import { applyAppearance, readStoredAppearance, type Appearance } from "@/lib/appearance";
 import { layoutWaterfall } from "@/lib/chartMath";
 import { ensureChartArtifactStyle } from "@/lib/chartStyles";
 import { decodeExportEntitlementToken, exportDimensions, safeExportName, watermarkText, type ExportBackground, type ExportMode, type ExportScale, type ExportSettings } from "@/lib/export";
 import { createSampleProject } from "@/lib/samples";
+import { shortcutLabel } from "@/lib/shortcuts";
 import { saveStoredProject, loadStoredProject } from "@/lib/storage";
 import { themes } from "@/lib/themes";
 import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SankeyData, ScatterData, SelectableElement, VisualOverride, WaterfallData } from "@/lib/types";
@@ -86,6 +88,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   const [project, setProject] = useState<ChartProject>(() => initialProject ?? createSampleProject("pie"));
   const [history, setHistory] = useState<{ past: ChartProject[]; future: ChartProject[] }>({ past: [], future: [] });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const apple = useApplePlatform();
   const [exportSettings, setExportSettings] = useState<ExportSettings>(defaultExportSettings);
   const [hydrated, setHydrated] = useState(false);
   const [activeRailTab, setActiveRailTab] = useState<RailTab>("inspector");
@@ -619,6 +622,9 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
   /* Every chrome command in one searchable list. Built during render rather than
      memoized: the list is small, and the callbacks it closes over change with
      almost every state field anyway. */
+  const undoHint = shortcutLabel({ key: "Z", mod: true }, apple);
+  // Both redo chords work; show the one each platform expects.
+  const redoHint = apple ? shortcutLabel({ key: "Z", mod: true, shift: true }, true) : shortcutLabel({ key: "Y", mod: true }, false);
   const commands: PaletteCommand[] = [
     ...chartTypes.map((chart) => ({
       id: `chart-${chart.id}`,
@@ -632,8 +638,8 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
     { id: "datasheet", group: "Data", label: "Open datasheet", icon: Table2, disabled: !hasDatasheet(project.type), run: () => setDatasheetOpen(true) },
     { id: "reset-data", group: "Data", label: "Reset chart data", icon: RefreshCcw, run: resetData },
     { id: "reset-visual", group: "Data", label: "Reset visual edits", icon: Palette, run: resetVisualEdits },
-    { id: "undo", group: "History", label: "Undo", icon: Undo2, hint: "⌘Z", disabled: history.past.length === 0, run: undo },
-    { id: "redo", group: "History", label: "Redo", icon: Redo2, hint: "⇧⌘Z", disabled: history.future.length === 0, run: redo },
+    { id: "undo", group: "History", label: "Undo", icon: Undo2, hint: undoHint, disabled: history.past.length === 0, run: undo },
+    { id: "redo", group: "History", label: "Redo", icon: Redo2, hint: redoHint, disabled: history.future.length === 0, run: redo },
     { id: "export-svg", group: "Export", label: "Download SVG", icon: Download, run: () => void exportSvg() },
     { id: "export-png", group: "Export", label: "Download PNG", icon: FileImage, run: () => void exportPng() },
     { id: "export-settings", group: "Export", label: "Export settings", icon: SlidersHorizontal, run: () => showRailTab("export") },
@@ -839,7 +845,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
             type="button"
             onClick={undo}
             aria-label="Undo"
-            data-tip="Undo ⌘Z"
+            data-tip={`Undo ${undoHint}`}
             disabled={history.past.length === 0}
           >
             <Undo2 size={15} aria-hidden="true" />
@@ -849,7 +855,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
             type="button"
             onClick={redo}
             aria-label="Redo"
-            data-tip="Redo ⇧⌘Z"
+            data-tip={`Redo ${redoHint}`}
             disabled={history.future.length === 0}
           >
             <Redo2 size={15} aria-hidden="true" />
@@ -872,7 +878,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
           <button className="palette-trigger" type="button" onClick={() => setPaletteOpen(true)}>
             <Command size={12} aria-hidden="true" />
             Commands
-            <span className="kbd">⌘K</span>
+            <span className="kbd">{shortcutLabel({ key: "K", mod: true }, apple)}</span>
           </button>
 
           <span className="bar-divider" aria-hidden="true" />
