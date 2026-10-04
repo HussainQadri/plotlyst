@@ -1110,6 +1110,11 @@ function ScatterChart({
   const scatterSettings = project.settings.scatter;
   const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);
   const selectedPoint = selectedId ? layout.points.find((p) => p.id === selectedId) : null;
+  // Big bubbles paint first so small ones on top stay clickable; the selection paints last.
+  const orderedPoints = [...layout.points].sort((a, b) => {
+    const selectionOrder = Number(selectedIds.includes(a.id)) - Number(selectedIds.includes(b.id));
+    return selectionOrder || b.r - a.r;
+  });
   const midX = layout.xDivider, midY = layout.yDivider;
   const labelLines = new Map(
     layout.points.map((point) => [point.id, buildLabelLines({ label: point.label, value: point.size, settings: project.settings })])
@@ -1192,7 +1197,7 @@ function ScatterChart({
       ) : null}
 
       <g className="scatter-marks">
-        {layout.points.map((point) => {
+        {orderedPoints.map((point) => {
           const selected = selectedIds.includes(point.id);
           return (
             <circle
