@@ -30,7 +30,7 @@ const defaultValueFormat: NumberFormatSettings = {
 
 export function defaultLabelSettings(type: ChartType): LabelSettings {
   return {
-    fields: type === "pie" ? ["label", "percent"] : ["label", "value"],
+    fields: type === "pie" ? ["label", "percent"] : type === "scatter" ? ["label"] : ["label", "value"],
     separator: "space",
     valueFormat: {
       ...defaultValueFormat,
