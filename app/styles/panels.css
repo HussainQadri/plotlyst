@@ -185,6 +185,33 @@
   min-height: 26px;
 }
 
+/* ---------- Sankey link cards ---------- */
+
+.link-route,
+.link-meta {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+
+.link-route {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.link-route svg {
+  color: var(--fg-faint);
+}
+
+.link-meta {
+  grid-template-columns: minmax(0, 1fr) var(--control-h-sm);
+}
+
+.link-route select,
+.link-meta input {
+  min-width: 0;
+  min-height: 26px;
+}
+
 /* ---------- Marimekko column cards ---------- */
 
 .mekko-manager {

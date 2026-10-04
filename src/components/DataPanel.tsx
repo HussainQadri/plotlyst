@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Table2, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, Table2, Trash2 } from "lucide-react";
 import { parseDelimited, toNumber } from "@/lib/csv";
 import { isCalculatedWaterfallKind, normalizeWaterfallKind, parseScatterSheet } from "@/lib/datasheet";
 import { NumberField } from "./ui/NumberField";
@@ -587,15 +587,17 @@ function SankeyDataEditor({ project, setProject, setSelectedId }: DataPanelProps
       <div className="section-title" style={{ marginTop: 12 }}>Links</div>
       {data.links.map((link) => (
         <div key={link.id} className="data-row-card">
-          <div className="row-card-controls">
+          <div className="link-route">
             <select value={link.sourceId} onChange={(e) => updateLink(link.id, "sourceId", e.target.value)} aria-label="Source node">
               {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
             </select>
-            <span style={{ fontSize: 10, color: "var(--color-muted)" }}>→</span>
+            <ArrowRight size={13} aria-hidden="true" />
             <select value={link.targetId} onChange={(e) => updateLink(link.id, "targetId", e.target.value)} aria-label="Target node">
               {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
             </select>
-            <input type="number" value={link.value} style={{ width: 60 }} onChange={(e) => updateLink(link.id, "value", e.target.value)} aria-label="Link value" />
+          </div>
+          <div className="link-meta">
+            <input type="number" value={link.value} onChange={(e) => updateLink(link.id, "value", e.target.value)} aria-label="Link value" />
             <button className="table-icon danger" type="button" onClick={() => removeLink(link.id)} aria-label="Remove link">
               <Trash2 size={13} aria-hidden="true" />
             </button>
