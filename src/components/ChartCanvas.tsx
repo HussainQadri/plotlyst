@@ -1037,6 +1037,8 @@ function SankeyChart({
         : null}
       {layout.nodes.map((node) => {
         const selected = selectedIds.includes(node.id);
+        // Right-half labels sit left of their node so they read into the flows, not off the slide.
+        const labelOnLeft = node.x + node.width / 2 > w / 2;
         return (
           <g key={node.id}>
             <rect
@@ -1053,9 +1055,9 @@ function SankeyChart({
             />
             {project.settings.sankey.showNodeLabels && node.labelVisible ? (
               <text
-                x={node.x + node.width + 6}
+                x={labelOnLeft ? node.x - 6 : node.x + node.width + 6}
                 y={node.y + node.height / 2 + 4}
-                textAnchor="start"
+                textAnchor={labelOnLeft ? "end" : "start"}
                 className="svg-axis"
                 fill={project.theme.foreground}
               >
