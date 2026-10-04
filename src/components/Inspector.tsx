@@ -1,6 +1,7 @@
 "use client";
 
 import { Eye, EyeOff, MousePointer2, Settings2, X } from "lucide-react";
+import { NumberField } from "./ui/NumberField";
 import type {
   Annotation,
   ChartProject,
@@ -373,12 +374,11 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
           <div className="field-grid">
             <label className="field">
               <span>Decimals</span>
-              <input
-                type="number"
+              <NumberField
                 min="0"
                 max="3"
                 value={valueFormat.decimals}
-                onChange={(event) => updateValueFormat({ decimals: Number(event.target.value) })}
+                onCommit={(decimals) => updateValueFormat({ decimals: clampInteger(decimals, 0, 3) })}
               />
             </label>
             <label className="field">
@@ -402,12 +402,11 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
             {project.type !== "scatter" ? (
               <label className="field">
                 <span>Percent dp</span>
-                <input
-                  type="number"
+                <NumberField
                   min="0"
                   max="2"
                   value={labelContent.percentDecimals}
-                  onChange={(event) => updateLabelContent({ percentDecimals: Number(event.target.value) })}
+                  onCommit={(percentDecimals) => updateLabelContent({ percentDecimals: clampInteger(percentDecimals, 0, 2) })}
                 />
               </label>
             ) : null}
@@ -513,12 +512,12 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
               </label>
               <label className="field">
                 <span>Other below</span>
-                <input
-                  type="number"
+                <NumberField
+                  optional
                   min="0"
                   max="50"
                   value={Math.round((project.settings.mekko.otherThreshold ?? 0) * 100)}
-                  onChange={(event) => updateMekkoSettings({ otherThreshold: Math.max(0, Number(event.target.value)) / 100 || undefined })}
+                  onCommit={(percent) => updateMekkoSettings({ otherThreshold: clampInteger(percent ?? 0, 0, 50) / 100 || undefined })}
                 />
               </label>
             </div>
@@ -561,11 +560,11 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
             <div className="field-grid">
               <label className="field">
                 <span>Node width</span>
-                <input type="number" min="8" max="40" value={project.settings.sankey.nodeWidth} onChange={(e) => updateSankeySettings({ nodeWidth: Number(e.target.value) })} />
+                <NumberField min="8" max="40" value={project.settings.sankey.nodeWidth} onCommit={(nodeWidth) => updateSankeySettings({ nodeWidth: clampInteger(nodeWidth, 8, 40) })} />
               </label>
               <label className="field">
                 <span>Node gap</span>
-                <input type="number" min="4" max="40" value={project.settings.sankey.nodePadding} onChange={(e) => updateSankeySettings({ nodePadding: Number(e.target.value) })} />
+                <NumberField min="4" max="40" value={project.settings.sankey.nodePadding} onCommit={(nodePadding) => updateSankeySettings({ nodePadding: clampInteger(nodePadding, 4, 40) })} />
               </label>
               <label className="field">
                 <span>Align</span>
@@ -600,20 +599,20 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
                 <div className="field-grid">
                   <label className="field">
                     <span>X divider</span>
-                    <input
-                      type="number"
-                      value={project.settings.scatter.xDivider ?? ""}
+                    <NumberField
+                      optional
+                      value={project.settings.scatter.xDivider}
                       placeholder="Auto"
-                      onChange={(event) => updateScatterSettings({ xDivider: optionalNumber(event.target.value) })}
+                      onCommit={(xDivider) => updateScatterSettings({ xDivider })}
                     />
                   </label>
                   <label className="field">
                     <span>Y divider</span>
-                    <input
-                      type="number"
-                      value={project.settings.scatter.yDivider ?? ""}
+                    <NumberField
+                      optional
+                      value={project.settings.scatter.yDivider}
                       placeholder="Auto"
-                      onChange={(event) => updateScatterSettings({ yDivider: optionalNumber(event.target.value) })}
+                      onCommit={(yDivider) => updateScatterSettings({ yDivider })}
                     />
                   </label>
                 </div>
@@ -770,10 +769,8 @@ function annotationBreadcrumb(project: ChartProject): string {
   return `Chart / ${chartTypeName(project.type)} / Annotation`;
 }
 
-function optionalNumber(value: string): number | undefined {
-  if (value.trim() === "") return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 /** A labelled on/off control. role="switch" states the semantics that
