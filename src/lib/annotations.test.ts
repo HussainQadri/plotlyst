@@ -30,4 +30,20 @@ describe("annotation anchors", () => {
 
     expect(first?.valueLine?.y).not.toBe(second?.valueLine?.y);
   });
+
+  it("resolves scatter callouts without falling through to waterfall data", () => {
+    const project = {
+      ...createSampleProject("scatter"),
+      annotations: [{ id: "ann-scatter", type: "callout" as const, anchorIds: ["sc-cloud"], label: "Priority", visible: true }]
+    };
+
+    const resolved = resolveAnnotations(project);
+
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0].anchor.id).toBe("sc-cloud");
+    expect(resolved[0].anchor.x).toBeGreaterThan(120);
+    expect(resolved[0].anchor.x).toBeLessThan(820);
+    expect(resolved[0].anchor.y).toBeGreaterThan(55);
+    expect(resolved[0].anchor.y).toBeLessThan(415);
+  });
 });

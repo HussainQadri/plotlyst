@@ -1,5 +1,5 @@
-import { layoutMarimekko, layoutPie, layoutWaterfall } from "./chartMath";
-import type { Annotation, ChartProject, MarimekkoData, PieData, WaterfallData } from "./types";
+import { layoutMarimekko, layoutPie, layoutSankey, layoutScatter, layoutWaterfall } from "./chartMath";
+import type { Annotation, ChartProject, MarimekkoData, PieData, SankeyData, ScatterData, WaterfallData } from "./types";
 
 export type AnnotationAnchor = {
   id: string;
@@ -26,6 +26,8 @@ export type ResolvedAnnotation = {
 const pieCenter = { x: 360, y: 286 };
 const pieRadius = 142;
 const plot = { x: 112, y: 104, width: 736 };
+const scatterPlot = { x: 120, y: 55, width: 700, height: 360 };
+const sankeyPlot = { x: 90, y: 70, width: 780, height: 390 };
 
 export function resolveAnnotations(project: ChartProject): ResolvedAnnotation[] {
   return project.annotations.flatMap((annotation) => {
@@ -81,21 +83,73 @@ export function resolveAnnotationAnchor(project: ChartProject, anchorId: string)
     };
   }
 
-  const data = project.data as WaterfallData;
-  const bar = layoutWaterfall(data, project.theme.palette, project.visualOverrides, 736, 320, project.settings.waterfall).find((item) => item.id === anchorId);
-  if (!bar) return null;
-  const positive = bar.endValue >= bar.startValue;
-  return {
-    id: bar.id,
-    label: bar.label,
-    x: plot.x + bar.x + bar.width / 2,
-    y: plot.y + (positive ? bar.y : bar.y + bar.height),
-    valueLine: {
-      x1: plot.x,
-      x2: plot.x + plot.width,
-      y: plot.y + bar.connectorOutY
-    }
-  };
+  if (project.type === "waterfall") {
+    const data = project.data as WaterfallData;
+    const bar = layoutWaterfall(data, project.theme.palette, project.visualOverrides, 736, 320, project.settings.waterfall).find((item) => item.id === anchorId);
+    if (!bar) return null;
+    const positive = bar.endValue >= bar.startValue;
+    return {
+      id: bar.id,
+      label: bar.label,
+      x: plot.x + bar.x + bar.width / 2,
+      y: plot.y + (positive ? bar.y : bar.y + bar.height),
+      valueLine: {
+        x1: plot.x,
+        x2: plot.x + plot.width,
+        y: plot.y + bar.connectorOutY
+      }
+    };
+  }
+
+  if (project.type === "scatter") {
+    const data = project.data as ScatterData;
+    const point = layoutScatter(
+      data,
+      project.theme.palette,
+      project.visualOverrides,
+      scatterPlot.width,
+      scatterPlot.height,
+      project.settings.scatter
+    ).points.find((item) => item.id === anchorId);
+    if (!point) return null;
+    return {
+      id: point.id,
+      label: point.label,
+      x: scatterPlot.x + point.cx,
+      y: scatterPlot.y + point.cy,
+      valueLine: {
+        x1: scatterPlot.x,
+        x2: scatterPlot.x + scatterPlot.width,
+        y: scatterPlot.y + point.cy
+      }
+    };
+  }
+
+  if (project.type === "sankey") {
+    const data = project.data as SankeyData;
+    const node = layoutSankey(
+      data,
+      project.theme.palette,
+      project.visualOverrides,
+      sankeyPlot.width,
+      sankeyPlot.height,
+      project.settings.sankey
+    ).nodes.find((item) => item.id === anchorId);
+    if (!node) return null;
+    return {
+      id: node.id,
+      label: node.label,
+      x: sankeyPlot.x + node.x + node.width / 2,
+      y: sankeyPlot.y + node.y + node.height / 2,
+      valueLine: {
+        x1: sankeyPlot.x,
+        x2: sankeyPlot.x + sankeyPlot.width,
+        y: sankeyPlot.y + node.y + node.height / 2
+      }
+    };
+  }
+
+  return null;
 }
 
 function defaultAnnotationOffset(type: Annotation["type"]) {
