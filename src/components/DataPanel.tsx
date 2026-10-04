@@ -669,7 +669,7 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
 
   return (
     <>
-      <table className="data-table" onPaste={(event) => handlePaste(event, pastePoints)}>
+      <table className="data-table scatter-data-table" onPaste={(event) => handlePaste(event, pastePoints)}>
         <thead>
           <tr>
             <th>Label</th>

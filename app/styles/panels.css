@@ -113,6 +113,24 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.scatter-data-table .value-col {
+  width: 50px;
+}
+
+.scatter-data-table input {
+  padding-inline: 3px;
+}
+
+.scatter-data-table input[type="number"] {
+  appearance: textfield;
+}
+
+.scatter-data-table input[type="number"]::-webkit-inner-spin-button,
+.scatter-data-table input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 /* ---------- Row cards (waterfall) ---------- */
 
 .row-card-list {
