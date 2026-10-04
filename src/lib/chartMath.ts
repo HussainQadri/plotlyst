@@ -531,26 +531,28 @@ export function layoutSankey(
   return { nodes: nodeLayouts, links: linkLayouts };
 }
 
+/**
+ * Separate a column's nodes by `padding` and keep them inside [0, maxH]: push
+ * overlaps down from the top, then, if the last node overflows, pin it to the
+ * bottom and push back up. The global scale guarantees every column fits.
+ */
 function sankeyResolveCollisions(col: SNode[], padding: number, maxH: number) {
   const sorted = [...col].sort((a, b) => a.y - b.y);
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const gap = prev.y + prev.height + padding - sorted[i].y;
-    if (gap > 0) sorted[i].y += gap;
+  let y = 0;
+  for (const node of sorted) {
+    if (node.y < y) node.y = y;
+    y = node.y + node.height + padding;
   }
-  // Push up from bottom if overflowed
-  const last = sorted[sorted.length - 1];
-  if (last && last.y + last.height > maxH) {
-    let excess = last.y + last.height - maxH;
-    for (let i = sorted.length - 1; i >= 0 && excess > 0; i--) {
-      const prev = i > 0 ? sorted[i - 1] : null;
-      const avail = prev ? sorted[i].y - (prev.y + prev.height + padding) : sorted[i].y;
-      const shift = Math.min(excess, Math.max(0, avail));
-      sorted[i].y -= shift;
-      excess -= shift;
-    }
+
+  const overflow = y - padding - maxH;
+  if (overflow <= 0) return;
+  y = maxH + padding;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const node = sorted[i];
+    const bottom = y - padding;
+    if (node.y + node.height > bottom) node.y = bottom - node.height;
+    y = node.y;
   }
-  for (const n of col) n.y = Math.max(0, n.y);
 }
 
 // ─── Scatter ───────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { layoutMarimekko, layoutPie, layoutScatter, layoutWaterfall } from "./chartMath";
-import { defaultScatterSettings, defaultWaterfallSettings } from "./labels";
-import { sampleMarimekkoData, samplePieData, sampleScatterData, sampleWaterfallData } from "./samples";
+import { layoutMarimekko, layoutPie, layoutSankey, layoutScatter, layoutWaterfall } from "./chartMath";
+import { defaultSankeySettings, defaultScatterSettings, defaultWaterfallSettings } from "./labels";
+import { sampleMarimekkoData, samplePieData, sampleSankeyData, sampleScatterData, sampleWaterfallData } from "./samples";
 import { defaultTheme } from "./themes";
 
 describe("chart layout math", () => {
@@ -226,5 +226,32 @@ describe("chart layout math", () => {
 
     expect(after.points[0].id).toBe(before.points[1].id);
     expect(after.points[0].color).toBe(before.points[1].color);
+  });
+
+  it("keeps every Sankey node inside the plot without overlapping its column", () => {
+    const settings = defaultSankeySettings();
+    const dense = {
+      nodes: [
+        { id: "src", label: "Source" },
+        ...Array.from({ length: 6 }, (_, index) => ({ id: `t${index}`, label: `Target ${index}` }))
+      ],
+      links: Array.from({ length: 6 }, (_, index) => ({ id: `l${index}`, sourceId: "src", targetId: `t${index}`, value: 10 + index * 7 }))
+    };
+
+    [sampleSankeyData, dense].forEach((data) => {
+      const { nodes } = layoutSankey(data, defaultTheme.palette, {}, 780, 390, settings);
+      nodes.forEach((node) => {
+        expect(node.y).toBeGreaterThanOrEqual(-1e-6);
+        expect(node.y + node.height).toBeLessThanOrEqual(390 + 1e-6);
+      });
+      const columns = new Map<number, typeof nodes>();
+      nodes.forEach((node) => columns.set(node.depth, [...(columns.get(node.depth) ?? []), node]));
+      columns.forEach((column) => {
+        const sorted = [...column].sort((a, b) => a.y - b.y);
+        sorted.slice(1).forEach((node, index) => {
+          expect(node.y - (sorted[index].y + sorted[index].height)).toBeGreaterThanOrEqual(settings.nodePadding - 1e-6);
+        });
+      });
+    });
   });
 });
