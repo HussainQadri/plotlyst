@@ -24,6 +24,7 @@ import type { ValidationResult } from "@/lib/validation";
 
 const labelSnapThreshold = 8;
 const toolbarWidth = 306;
+const toolbarHeight = 42;
 
 type ChartCanvasProps = {
   project: ChartProject;
@@ -488,7 +489,9 @@ function MarimekkoChart({
   const segments = layoutMarimekko(data, project.theme.palette, project.visualOverrides, width, height, mekkoSettings);
   const selectedSegment = selectedId ? segments.find((segment) => segment.id === selectedId) : null;
   const toolbarX = selectedSegment ? clamp(selectedSegment.x + selectedSegment.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
-  const toolbarY = selectedSegment ? clamp(selectedSegment.y - 50, -56, height - 44) : -50;
+  const toolbarY = selectedSegment
+    ? toolbarTop(selectedSegment.y, selectedSegment.y + selectedSegment.height, y, height, project.settings.showTitle)
+    : 0;
   const columnLabels = data.columns.map((column) => ({
     label: column.label,
     start: segments.find((segment) => segment.columnLabel === column.label)?.x ?? 0,
@@ -692,7 +695,7 @@ function WaterfallChart({
   const bars = layoutWaterfall(data, project.theme.palette, project.visualOverrides, width, height, waterfallSettings);
   const selectedBar = selectedId ? bars.find((bar) => bar.id === selectedId) : null;
   const toolbarX = selectedBar ? clamp(selectedBar.x + selectedBar.width / 2 - toolbarWidth / 2, 0, width - toolbarWidth) : 0;
-  const toolbarY = selectedBar ? clamp(selectedBar.y - 50, -56, height - 44) : -50;
+  const toolbarY = selectedBar ? toolbarTop(selectedBar.y, selectedBar.y + selectedBar.height, y, height, project.settings.showTitle) : 0;
   const shouldShowConnectors = waterfallSettings.showConnectors && waterfallSettings.connectorStyle !== "none";
 
   return (
@@ -903,7 +906,7 @@ function CanvasToolbar({
 
   return (
     <g transform={`translate(${x} ${y})`} className="canvas-toolbar" data-export-hidden="true" onClick={stop}>
-      <rect x="0" y="0" width={toolbarWidth} height="42" rx="6" fill="#fffcf6" stroke="#cfc8bd" />
+      <rect x="0" y="0" width={toolbarWidth} height={toolbarHeight} rx="6" fill="#fffcf6" stroke="#cfc8bd" />
       {palette.slice(0, 4).map((color, index) => (
         <g key={color} className="toolbar-hit" onClick={() => onUpdateOverride(id, { fill: color })}>
           <rect x={10 + index * 24} y="10" width="18" height="22" rx="4" fill={color} stroke="#ffffff" />
@@ -998,6 +1001,21 @@ function moveLabelPoint(point: LabelPoint, y: number) {
   if (point.leader) point.leader.y2 = y;
 }
 
+/** Lowest slide y the toolbar's top may reach while the title is showing. */
+const toolbarTitleClearance = 76;
+
+/**
+ * Toolbar top in plot coordinates: just above the selected mark, or, when that
+ * would cover the slide title, just below a short mark or over a tall mark's top.
+ */
+function toolbarTop(markTop: number, markBottom: number, plotY: number, plotHeight: number, titleShown: boolean): number {
+  const minTop = (titleShown ? toolbarTitleClearance : 8) - plotY;
+  const above = markTop - toolbarHeight - 8;
+  if (above >= minTop) return above;
+  const below = markBottom - markTop > 120 ? markTop + 12 : markBottom + 8;
+  return clamp(below, minTop, plotHeight - toolbarHeight - 2);
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -1080,7 +1098,7 @@ function SankeyChart({
         <CanvasToolbar
           id={selectedId}
           x={clamp(selectedNode.x + selectedNode.width + 8, 0, w - toolbarWidth)}
-          y={clamp(selectedNode.y - 50, -56, h - 44)}
+          y={toolbarTop(selectedNode.y, selectedNode.y + selectedNode.height, oy, h, project.settings.showTitle)}
           palette={project.theme.palette}
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
@@ -1280,7 +1298,7 @@ function ScatterChart({
         <CanvasToolbar
           id={selectedId}
           x={clamp(selectedPoint.cx + selectedPoint.r + 8, 0, w - toolbarWidth)}
-          y={clamp(selectedPoint.cy - 50, -56, h - 44)}
+          y={toolbarTop(selectedPoint.cy - selectedPoint.r, selectedPoint.cy + selectedPoint.r, oy, h, project.settings.showTitle)}
           palette={theme.palette}
           override={project.visualOverrides[selectedId] ?? {}}
           onUpdateOverride={onUpdateOverride}
