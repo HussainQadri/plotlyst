@@ -535,14 +535,15 @@ function MarimekkoChart({
       ) : null}
       {mekkoSettings.showColumnTotals || mekkoSettings.showColumnPercentages ? (
         <g>
-          {columnLabels.map((column) => (
-            <text key={`${column.label}-total`} x={column.start + column.width / 2} y="-14" textAnchor="middle" className="svg-mekko-total" fill={project.theme.foreground}>
-              {[
-                mekkoSettings.showColumnTotals ? formatValue(column.total, project.settings.labelContent.valueFormat) : null,
-                mekkoSettings.showColumnPercentages ? formatPercent(column.percentage, project.settings.labelContent.percentDecimals) : null
-              ].filter(Boolean).join(" / ")}
-            </text>
-          ))}
+          {columnLabels.map((column) => {
+            const total = mekkoSettings.showColumnTotals ? formatValue(column.total, project.settings.labelContent.valueFormat) : null;
+            const share = mekkoSettings.showColumnPercentages ? formatPercent(column.percentage, project.settings.labelContent.percentDecimals) : null;
+            return (
+              <text key={`${column.label}-total`} x={column.start + column.width / 2} y="-14" textAnchor="middle" className="svg-mekko-total" fill={project.theme.foreground}>
+                {total && share ? `${total} (${share})` : total ?? share}
+              </text>
+            );
+          })}
         </g>
       ) : null}
       {mekkoSettings.showAxis ? (
