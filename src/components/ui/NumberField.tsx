@@ -3,12 +3,12 @@
 import { useState, type InputHTMLAttributes } from "react";
 import { parseNumberDraft } from "@/lib/datasheet";
 
-type NumberFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & {
-  value: number | undefined;
-  /** Clearing the field commits `undefined` instead of being ignored. */
-  optional?: boolean;
-  onCommit: (value: number | undefined) => void;
-};
+type NumberFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> &
+  (
+    | { optional?: false; value: number; onCommit: (value: number) => void }
+    /** Clearing an optional field commits `undefined` instead of being ignored. */
+    | { optional: true; value: number | undefined; onCommit: (value: number | undefined) => void }
+  );
 
 /**
  * A number input that holds what the user is typing as a local draft and only
@@ -17,6 +17,8 @@ type NumberFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "va
  */
 export function NumberField({ value, optional = false, onCommit, onBlur, ...inputProps }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  // A required field never parses to undefined, so either callback accepts what's committed.
+  const commit = onCommit as (value: number | undefined) => void;
 
   return (
     <input
@@ -26,7 +28,7 @@ export function NumberField({ value, optional = false, onCommit, onBlur, ...inpu
       onChange={(event) => {
         setDraft(event.target.value);
         const parsed = parseNumberDraft(event.target.value, optional);
-        if (parsed !== null) onCommit(parsed);
+        if (parsed !== null) commit(parsed);
       }}
       onBlur={(event) => {
         setDraft(null);

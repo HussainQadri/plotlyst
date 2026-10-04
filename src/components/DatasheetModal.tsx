@@ -391,7 +391,7 @@ function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<Datasheet
                     data-sheet-cell={`${rowIndex}:1`}
                     onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 1 })}
                     onFocus={() => setSelectedId(point.id)}
-                    onCommit={(x) => x !== undefined && updatePoint(point.id, { x })}
+                    onCommit={(x) => updatePoint(point.id, { x })}
                   />
                 </td>
                 <td>
@@ -400,7 +400,7 @@ function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<Datasheet
                     data-sheet-cell={`${rowIndex}:2`}
                     onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 2 })}
                     onFocus={() => setSelectedId(point.id)}
-                    onCommit={(y) => y !== undefined && updatePoint(point.id, { y })}
+                    onCommit={(y) => updatePoint(point.id, { y })}
                   />
                 </td>
                 <td>

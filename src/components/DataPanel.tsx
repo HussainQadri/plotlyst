@@ -688,10 +688,10 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
                 <input value={point.label} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, { label: e.target.value })} aria-label={`Point ${point.label} label`} />
               </td>
               <td>
-                <NumberField value={point.x} onFocus={() => setSelectedId(point.id)} onCommit={(x) => x !== undefined && updatePoint(point.id, { x })} aria-label={`${point.label} x`} />
+                <NumberField value={point.x} onFocus={() => setSelectedId(point.id)} onCommit={(x) => updatePoint(point.id, { x })} aria-label={`${point.label} x`} />
               </td>
               <td>
-                <NumberField value={point.y} onFocus={() => setSelectedId(point.id)} onCommit={(y) => y !== undefined && updatePoint(point.id, { y })} aria-label={`${point.label} y`} />
+                <NumberField value={point.y} onFocus={() => setSelectedId(point.id)} onCommit={(y) => updatePoint(point.id, { y })} aria-label={`${point.label} y`} />
               </td>
               <td>
                 <NumberField optional min="0" value={point.size} onFocus={() => setSelectedId(point.id)} onCommit={(size) => updatePoint(point.id, { size })} aria-label={`${point.label} bubble size`} />
