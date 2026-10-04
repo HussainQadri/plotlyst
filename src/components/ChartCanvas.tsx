@@ -13,10 +13,6 @@ import {
   layoutWaterfall,
   type MarimekkoSegmentLayout,
   type PieSliceLayout,
-  type SankeyNodeLayout,
-  type SankeyLinkLayout,
-  type ScatterPointLayout,
-  type ScatterAxisTick,
   type WaterfallBarLayout
 } from "@/lib/chartMath";
 import { buildLabelLines, formatPercent, formatValue } from "@/lib/labels";
