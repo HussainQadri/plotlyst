@@ -23,6 +23,7 @@ export const chartArtifactCss = `
 .svg-title{font-size:28px;font-weight:600;letter-spacing:-0.01em}
 .svg-label{font-size:13px;font-weight:500;paint-order:stroke;stroke:var(--halo,#ffffff);stroke-width:3px;stroke-linejoin:round}
 .svg-label.light{font-size:12px;font-weight:500;stroke:rgba(0,0,0,0.22);stroke-width:2px}
+.svg-label.ink{font-size:12px;font-weight:500;stroke:rgba(255,255,255,0.3);stroke-width:2px}
 .svg-axis{font-size:12px;font-weight:400}
 .svg-note{font-size:12px;font-weight:500}
 .svg-mekko-total{font-size:11px;font-weight:600;paint-order:stroke;stroke:var(--halo,#ffffff);stroke-width:3px;stroke-linejoin:round}

@@ -17,7 +17,7 @@ import {
   type WaterfallBarLayout
 } from "@/lib/chartMath";
 import { buildLabelLines, formatPercent, formatValue } from "@/lib/labels";
-import { pieLabelPoint, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
+import { pieLabelPoint, placeScatterLabels, rectLabelPoint, waterfallLabelPoint, type LabelPoint } from "@/lib/labelPlacement";
 import type { Annotation, ChartProject, LabelPlacement, MarimekkoData, PieData, SankeyData, ScatterData, VisualOverride, WaterfallData } from "@/lib/types";
 import type { ValidationResult } from "@/lib/validation";
 
@@ -1111,6 +1111,25 @@ function ScatterChart({
   const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);
   const selectedPoint = selectedId ? layout.points.find((p) => p.id === selectedId) : null;
   const midX = layout.xDivider, midY = layout.yDivider;
+  const labelLines = new Map(
+    layout.points.map((point) => [point.id, buildLabelLines({ label: point.label, value: point.size, settings: project.settings })])
+  );
+  const labelPoints = placeScatterLabels(
+    layout.points
+      .filter((point) => project.settings.showLabels && point.labelVisible)
+      .map((point) => ({
+        id: point.id,
+        cx: point.cx,
+        cy: point.cy,
+        radius: point.r,
+        color: point.color,
+        lines: labelLines.get(point.id) ?? [],
+        placement: point.labelPlacement,
+        offset: project.visualOverrides[point.id]?.labelOffset
+      })),
+    { width: w, height: h },
+    project.theme.foreground
+  );
 
   return (
     <g transform={`translate(${ox} ${oy})`}>
@@ -1172,14 +1191,12 @@ function ScatterChart({
         </text>
       ) : null}
 
-      {layout.points.map((point) => {
-        const selected = selectedIds.includes(point.id);
-        const offset = project.visualOverrides[point.id]?.labelOffset;
-        const labelX = point.cx + (offset?.dx ?? 0);
-        const labelY = point.cy - point.r - 6 + (offset?.dy ?? 0);
-        return (
-          <g key={point.id}>
+      <g className="scatter-marks">
+        {layout.points.map((point) => {
+          const selected = selectedIds.includes(point.id);
+          return (
             <circle
+              key={point.id}
               cx={point.cx}
               cy={point.cy}
               r={point.r}
@@ -1190,22 +1207,28 @@ function ScatterChart({
               className="selectable-mark"
               onClick={(e) => { e.stopPropagation(); onSelect(point.id, { additive: e.shiftKey || e.metaKey || e.ctrlKey }); }}
             />
-            {project.settings.showLabels && point.labelVisible ? (
-              <text
-                x={labelX}
-                y={labelY}
-                textAnchor="middle"
-                className="svg-label label-handle"
-                fill={project.theme.foreground}
-                onPointerDown={(e) => onStartLabelDrag(point.id, e)}
-                onDoubleClick={(e) => { e.stopPropagation(); onResetLabelPosition(point.id); }}
-              >
-                {point.label}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
+          );
+        })}
+      </g>
+
+      <g className="scatter-labels">
+        {layout.points.map((point) => {
+          const labelPoint = labelPoints.get(point.id);
+          const lines = labelLines.get(point.id) ?? [];
+          return labelPoint && lines.length > 0 ? (
+            <ChartLabel
+              key={point.id}
+              id={point.id}
+              lines={lines}
+              point={labelPoint}
+              muted={project.theme.muted}
+              selected={selectedIds.includes(point.id)}
+              onStartDrag={onStartLabelDrag}
+              onResetPosition={onResetLabelPosition}
+            />
+          ) : null;
+        })}
+      </g>
 
       {selectedId && selectedPoint ? (
         <CanvasToolbar
