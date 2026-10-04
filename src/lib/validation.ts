@@ -1,4 +1,4 @@
-import type { ChartProject, MarimekkoData, PieData, WaterfallData } from "./types";
+import type { ChartProject, MarimekkoData, PieData, ScatterData, WaterfallData } from "./types";
 
 export type ValidationResult = {
   valid: boolean;
@@ -22,6 +22,10 @@ export function validateProject(project: ChartProject): ValidationResult {
 
   if (project.type === "waterfall") {
     validateWaterfall(project.data as WaterfallData, errors);
+  }
+
+  if (project.type === "scatter") {
+    validateScatter(project.data as ScatterData, errors);
   }
 
   return { valid: errors.length === 0, errors };
@@ -77,6 +81,22 @@ function validateWaterfall(data: WaterfallData, errors: string[]) {
     if (!Number.isFinite(row.amount)) errors.push(`${row.label || "A bar"} needs a numeric amount.`);
     if (!["start", "change", "subtotal", "total"].includes(row.kind)) {
       errors.push(`${row.label || "A bar"} has an unknown waterfall kind.`);
+    }
+  });
+}
+
+function validateScatter(data: ScatterData, errors: string[]) {
+  if (data.points.length < 2) {
+    errors.push("Scatter charts need at least two points.");
+  }
+
+  data.points.forEach((point) => {
+    const name = point.label.trim() || "A scatter point";
+    if (!point.label.trim()) errors.push("Every scatter point needs a label.");
+    if (!Number.isFinite(point.x)) errors.push(`${name} needs a numeric X value.`);
+    if (!Number.isFinite(point.y)) errors.push(`${name} needs a numeric Y value.`);
+    if (point.size !== undefined && (!Number.isFinite(point.size) || point.size < 0)) {
+      errors.push(`${name} needs a non-negative bubble size.`);
     }
   });
 }
