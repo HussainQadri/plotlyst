@@ -1135,6 +1135,8 @@ function ScatterChart({
     { width: w, height: h },
     project.theme.foreground
   );
+  const describePoint = (point: (typeof layout.points)[number]) =>
+    `${point.label}: X ${point.x}, Y ${point.y}${scatterSettings.showBubbles && point.size ? `, size ${point.size}` : ""}`;
 
   return (
     <g transform={`translate(${ox} ${oy})`}>
@@ -1210,8 +1212,22 @@ function ScatterChart({
               stroke={selected ? "#174f51" : project.theme.background}
               strokeWidth={selected ? 3 : 1.5}
               className="selectable-mark"
-              onClick={(e) => { e.stopPropagation(); onSelect(point.id, { additive: e.shiftKey || e.metaKey || e.ctrlKey }); }}
-            />
+              role="button"
+              tabIndex={0}
+              aria-label={describePoint(point)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect(point.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.stopPropagation();
+                onSelect(point.id, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
+              }}
+            >
+              <title>{describePoint(point)}</title>
+            </circle>
           );
         })}
       </g>
