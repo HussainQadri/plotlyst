@@ -54,13 +54,11 @@ export function DataPanel({ project, setProject, setSelectedId }: DataPanelProps
 function PieDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
   const data = project.data as PieData;
 
-  function updateRow(id: string, field: "label" | "value", value: string) {
+  function updateRow(id: string, patch: { label?: string; value?: number }) {
     setProject((current) => ({
       ...current,
       data: {
-        rows: (current.data as PieData).rows.map((row) =>
-          row.id === id ? { ...row, [field]: field === "value" ? Number(value) : value } : row
-        )
+        rows: (current.data as PieData).rows.map((row) => (row.id === id ? { ...row, ...patch } : row))
       }
     }));
   }
@@ -127,16 +125,15 @@ function PieDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
                   value={row.label}
                   aria-label={`Slice ${row.label} label`}
                   onFocus={() => setSelectedId(row.id)}
-                  onChange={(event) => updateRow(row.id, "label", event.target.value)}
+                  onChange={(event) => updateRow(row.id, { label: event.target.value })}
                 />
               </td>
               <td>
-                <input
-                  type="number"
+                <NumberField
                   value={row.value}
                   aria-label={`Slice ${row.label} value`}
                   onFocus={() => setSelectedId(row.id)}
-                  onChange={(event) => updateRow(row.id, "value", event.target.value)}
+                  onCommit={(value) => updateRow(row.id, { value })}
                 />
               </td>
               <td>
@@ -189,7 +186,7 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
     }));
   }
 
-  function updateSegmentValue(columnId: string, segmentIndex: number, value: string) {
+  function updateSegmentValue(columnId: string, segmentIndex: number, value: number) {
     setProject((current) => ({
       ...current,
       data: {
@@ -198,7 +195,7 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
           return {
             ...column,
             segments: column.segments.map((segment, index) =>
-              index === segmentIndex ? { ...segment, value: Number(value) } : segment
+              index === segmentIndex ? { ...segment, value } : segment
             )
           };
         })
@@ -326,12 +323,11 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
                     onFocus={() => setSelectedId(segment.id)}
                     onChange={(event) => updateSegmentLabel(segmentIndex, event.target.value)}
                   />
-                  <input
+                  <NumberField
                     aria-label={`${column.label} value for ${segment.label}`}
-                    type="number"
                     value={segment.value}
                     onFocus={() => setSelectedId(segment.id)}
-                    onChange={(event) => updateSegmentValue(column.id, segmentIndex, event.target.value)}
+                    onCommit={(value) => updateSegmentValue(column.id, segmentIndex, value)}
                   />
                   <button
                     className="table-icon danger"
@@ -382,13 +378,19 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
 function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
   const data = project.data as WaterfallData;
 
-  function updateRow(id: string, field: "label" | "amount" | "kind", value: string) {
+  function updateAmount(id: string, amount: number) {
+    setProject((current) => ({
+      ...current,
+      data: { rows: (current.data as WaterfallData).rows.map((row) => (row.id === id ? { ...row, amount } : row)) }
+    }));
+  }
+
+  function updateRow(id: string, field: "label" | "kind", value: string) {
     setProject((current) => ({
       ...current,
       data: {
         rows: (current.data as WaterfallData).rows.map((row) => {
           if (row.id !== id) return row;
-          if (field === "amount") return { ...row, amount: Number(value) };
           if (field === "kind") {
             const kind = normalizeWaterfallKind(value) ?? "change";
             return { ...row, kind, amount: isCalculatedWaterfallKind(kind) ? 0 : row.amount };
@@ -465,12 +467,11 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
               />
             </div>
             <div className="row-card-controls">
-              <input
-                type="number"
+              <NumberField
                 value={row.amount}
                 disabled={isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"}
                 onFocus={() => setSelectedId(row.id)}
-                onChange={(event) => updateRow(row.id, "amount", event.target.value)}
+                onCommit={(amount) => updateAmount(row.id, amount)}
                 aria-label={`${row.label} amount`}
                 title={
                   isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"
@@ -538,8 +539,8 @@ function SankeyDataEditor({ project, setProject, setSelectedId }: DataPanelProps
     setSelectedId(null);
   }
 
-  function updateLink(id: string, field: "sourceId" | "targetId" | "value", value: string) {
-    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), links: (c.data as SankeyData).links.map((l) => l.id !== id ? l : { ...l, [field]: field === "value" ? Number(value) : value }) } }));
+  function updateLink(id: string, patch: { sourceId?: string; targetId?: string; value?: number }) {
+    setProject((c) => ({ ...c, data: { ...(c.data as SankeyData), links: (c.data as SankeyData).links.map((l) => (l.id !== id ? l : { ...l, ...patch })) } }));
   }
 
   function addLink() {
@@ -588,16 +589,16 @@ function SankeyDataEditor({ project, setProject, setSelectedId }: DataPanelProps
       {data.links.map((link) => (
         <div key={link.id} className="data-row-card">
           <div className="link-route">
-            <select value={link.sourceId} onChange={(e) => updateLink(link.id, "sourceId", e.target.value)} aria-label="Source node">
+            <select value={link.sourceId} onChange={(e) => updateLink(link.id, { sourceId: e.target.value })} aria-label="Source node">
               {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
             </select>
             <ArrowRight size={13} aria-hidden="true" />
-            <select value={link.targetId} onChange={(e) => updateLink(link.id, "targetId", e.target.value)} aria-label="Target node">
+            <select value={link.targetId} onChange={(e) => updateLink(link.id, { targetId: e.target.value })} aria-label="Target node">
               {data.nodes.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
             </select>
           </div>
           <div className="link-meta">
-            <input type="number" value={link.value} onChange={(e) => updateLink(link.id, "value", e.target.value)} aria-label="Link value" />
+            <NumberField min="0" value={link.value} onCommit={(value) => updateLink(link.id, { value })} aria-label="Link value" />
             <button className="table-icon danger" type="button" onClick={() => removeLink(link.id)} aria-label="Remove link">
               <Trash2 size={13} aria-hidden="true" />
             </button>
