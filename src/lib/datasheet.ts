@@ -78,6 +78,17 @@ export function parseScatterSheet(text: string, makeId: IdFactory): ScatterData 
   };
 }
 
+/**
+ * Reads an in-progress numeric cell: a finite number, `undefined` for a cleared
+ * optional cell, or `null` while the text isn't a usable number yet.
+ */
+export function parseNumberDraft(text: string, optional = false): number | undefined | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return optional ? undefined : null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function normalizeWaterfallKind(value: string | undefined): WaterfallKind | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();

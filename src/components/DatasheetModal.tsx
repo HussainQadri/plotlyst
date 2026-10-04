@@ -2,6 +2,7 @@
 
 import { Columns3, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { NumberField } from "./ui/NumberField";
 import { useFocusTrap } from "./ui/useFocusTrap";
 import {
   isCalculatedWaterfallKind,
@@ -17,6 +18,7 @@ import type {
   MarimekkoData,
   PieData,
   ScatterData,
+  ScatterPoint,
   WaterfallData,
   WaterfallKind
 } from "@/lib/types";
@@ -305,13 +307,11 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
 function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModalProps, "onClose">) {
   const data = project.data as ScatterData;
 
-  function updatePoint(id: string, field: "label" | "x" | "y" | "size", value: string) {
+  function updatePoint(id: string, patch: Partial<ScatterPoint>) {
     setProject((current) => ({
       ...current,
       data: {
-        points: (current.data as ScatterData).points.map((point) =>
-          point.id === id ? { ...point, [field]: field === "label" ? value : Number(value) } : point
-        )
+        points: (current.data as ScatterData).points.map((point) => (point.id === id ? { ...point, ...patch } : point))
       }
     }));
   }
@@ -378,34 +378,36 @@ function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<Datasheet
                     value={point.label}
                     position={{ row: rowIndex, col: 0 }}
                     onFocus={() => setSelectedId(point.id)}
-                    onChange={(value) => updatePoint(point.id, "label", value)}
+                    onChange={(value) => updatePoint(point.id, { label: value })}
                   />
                 </td>
                 <td>
-                  <SheetInput
-                    type="number"
+                  <NumberField
                     value={point.x}
-                    position={{ row: rowIndex, col: 1 }}
+                    data-sheet-cell={`${rowIndex}:1`}
+                    onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 1 })}
                     onFocus={() => setSelectedId(point.id)}
-                    onChange={(value) => updatePoint(point.id, "x", value)}
+                    onCommit={(x) => x !== undefined && updatePoint(point.id, { x })}
                   />
                 </td>
                 <td>
-                  <SheetInput
-                    type="number"
+                  <NumberField
                     value={point.y}
-                    position={{ row: rowIndex, col: 2 }}
+                    data-sheet-cell={`${rowIndex}:2`}
+                    onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 2 })}
                     onFocus={() => setSelectedId(point.id)}
-                    onChange={(value) => updatePoint(point.id, "y", value)}
+                    onCommit={(y) => y !== undefined && updatePoint(point.id, { y })}
                   />
                 </td>
                 <td>
-                  <SheetInput
-                    type="number"
-                    value={point.size ?? ""}
-                    position={{ row: rowIndex, col: 3 }}
+                  <NumberField
+                    optional
+                    min="0"
+                    value={point.size}
+                    data-sheet-cell={`${rowIndex}:3`}
+                    onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 3 })}
                     onFocus={() => setSelectedId(point.id)}
-                    onChange={(value) => updatePoint(point.id, "size", value)}
+                    onCommit={(size) => updatePoint(point.id, { size })}
                   />
                 </td>
                 <td>

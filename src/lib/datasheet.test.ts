@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeWaterfallKind, parseMarimekkoMatrix, parsePieSheet, parseScatterSheet, parseWaterfallSheet } from "./datasheet";
+import { normalizeWaterfallKind, parseMarimekkoMatrix, parseNumberDraft, parsePieSheet, parseScatterSheet, parseWaterfallSheet } from "./datasheet";
 
 const makeId = (prefix: string) => `${prefix}-id`;
 
@@ -36,5 +36,13 @@ describe("datasheet parsing", () => {
       { id: "scatter-0-id", label: "Cloud", x: 78, y: 24, size: 420 },
       { id: "scatter-1-id", label: "CRM", x: 55, y: 8, size: 310 }
     ]);
+  });
+
+  it("parses numeric cells without committing half-typed values", () => {
+    expect(parseNumberDraft("42.5")).toBe(42.5);
+    expect(parseNumberDraft("-3")).toBe(-3);
+    expect(parseNumberDraft("")).toBeNull();
+    expect(parseNumberDraft("", true)).toBeUndefined();
+    expect(parseNumberDraft("-")).toBeNull();
   });
 });

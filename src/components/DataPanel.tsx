@@ -3,6 +3,7 @@
 import { Plus, Table2, Trash2 } from "lucide-react";
 import { parseDelimited, toNumber } from "@/lib/csv";
 import { isCalculatedWaterfallKind, normalizeWaterfallKind, parseScatterSheet } from "@/lib/datasheet";
+import { NumberField } from "./ui/NumberField";
 import type {
   ChartProject,
   MarimekkoColumn,
@@ -10,6 +11,7 @@ import type {
   PieData,
   SankeyData,
   ScatterData,
+  ScatterPoint,
   WaterfallData,
   WaterfallKind
 } from "@/lib/types";
@@ -611,13 +613,11 @@ function SankeyDataEditor({ project, setProject, setSelectedId }: DataPanelProps
 function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
   const data = project.data as ScatterData;
 
-  function updatePoint(id: string, field: "label" | "x" | "y" | "size", value: string) {
+  function updatePoint(id: string, patch: Partial<ScatterPoint>) {
     setProject((c) => ({
       ...c,
       data: {
-        points: (c.data as ScatterData).points.map((p) =>
-          p.id !== id ? p : { ...p, [field]: field === "label" ? value : Number(value) }
-        )
+        points: (c.data as ScatterData).points.map((p) => (p.id !== id ? p : { ...p, ...patch }))
       }
     }));
   }
@@ -683,16 +683,16 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
           {data.points.map((point) => (
             <tr key={point.id} className={project.visualOverrides[point.id] ? "has-override" : ""}>
               <td>
-                <input value={point.label} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "label", e.target.value)} aria-label={`Point ${point.label} label`} />
+                <input value={point.label} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, { label: e.target.value })} aria-label={`Point ${point.label} label`} />
               </td>
               <td>
-                <input type="number" value={point.x} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "x", e.target.value)} aria-label={`${point.label} x`} />
+                <NumberField value={point.x} onFocus={() => setSelectedId(point.id)} onCommit={(x) => x !== undefined && updatePoint(point.id, { x })} aria-label={`${point.label} x`} />
               </td>
               <td>
-                <input type="number" value={point.y} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "y", e.target.value)} aria-label={`${point.label} y`} />
+                <NumberField value={point.y} onFocus={() => setSelectedId(point.id)} onCommit={(y) => y !== undefined && updatePoint(point.id, { y })} aria-label={`${point.label} y`} />
               </td>
               <td>
-                <input type="number" value={point.size ?? ""} onFocus={() => setSelectedId(point.id)} onChange={(e) => updatePoint(point.id, "size", e.target.value)} aria-label={`${point.label} bubble size`} />
+                <NumberField optional min="0" value={point.size} onFocus={() => setSelectedId(point.id)} onCommit={(size) => updatePoint(point.id, { size })} aria-label={`${point.label} bubble size`} />
               </td>
               <td>
                 <button className="table-icon danger" type="button" onClick={() => removePoint(point.id)} aria-label={`Remove point ${point.label}`}>
