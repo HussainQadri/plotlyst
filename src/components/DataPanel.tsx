@@ -650,7 +650,12 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
     setProject((c) => {
       const ov = { ...c.visualOverrides };
       delete ov[id];
-      return { ...c, visualOverrides: ov, data: { points: (c.data as ScatterData).points.filter((p) => p.id !== id) } };
+      return {
+        ...c,
+        visualOverrides: ov,
+        annotations: c.annotations.filter((annotation) => !annotation.anchorIds.includes(id)),
+        data: { points: (c.data as ScatterData).points.filter((p) => p.id !== id) }
+      };
     });
     setSelectedId(null);
   }
