@@ -1,5 +1,5 @@
 import { parseDelimited, toNumber } from "./csv";
-import type { MarimekkoColumn, MarimekkoData, PieData, WaterfallData, WaterfallKind } from "./types";
+import type { MarimekkoColumn, MarimekkoData, PieData, ScatterData, WaterfallData, WaterfallKind } from "./types";
 
 export type IdFactory = (prefix: string) => string;
 
@@ -53,6 +53,29 @@ export function parseMarimekkoMatrix(text: string, makeId: IdFactory): Marimekko
   }));
 
   return { columns };
+}
+
+export function parseScatterSheet(text: string, makeId: IdFactory): ScatterData | null {
+  const rows = parseDelimited(text);
+  if (rows.length === 0) return null;
+
+  const firstRow = rows[0].map((cell) => cell.trim().toLowerCase());
+  const hasHeader = firstRow.includes("x") && firstRow.includes("y");
+  const body = hasHeader ? rows.slice(1) : rows;
+  if (body.length === 0) return null;
+
+  return {
+    points: body.map((row, index) => {
+      const rawSize = row[3]?.trim();
+      return {
+        id: makeId(`scatter-${index}`),
+        label: row[0] || `Point ${index + 1}`,
+        x: toNumber(row[1] ?? "0"),
+        y: toNumber(row[2] ?? "0"),
+        ...(rawSize ? { size: toNumber(rawSize) } : {})
+      };
+    })
+  };
 }
 
 export function normalizeWaterfallKind(value: string | undefined): WaterfallKind | null {

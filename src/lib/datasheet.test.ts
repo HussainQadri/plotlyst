@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeWaterfallKind, parseMarimekkoMatrix, parsePieSheet, parseWaterfallSheet } from "./datasheet";
+import { normalizeWaterfallKind, parseMarimekkoMatrix, parsePieSheet, parseScatterSheet, parseWaterfallSheet } from "./datasheet";
 
 const makeId = (prefix: string) => `${prefix}-id`;
 
@@ -27,5 +27,14 @@ describe("datasheet parsing", () => {
     expect(data?.columns).toHaveLength(2);
     expect(data?.columns[0].label).toBe("NA");
     expect(data?.columns[1].segments[0]).toMatchObject({ label: "Software", value: 38 });
+  });
+
+  it("maps scatter rows with an optional header and bubble size", () => {
+    const data = parseScatterSheet("Label\tX\tY\tSize\nCloud\t78\t24\t420\nCRM\t55\t8\t310", makeId);
+
+    expect(data?.points).toEqual([
+      { id: "scatter-0-id", label: "Cloud", x: 78, y: 24, size: 420 },
+      { id: "scatter-1-id", label: "CRM", x: 55, y: 8, size: 310 }
+    ]);
   });
 });
