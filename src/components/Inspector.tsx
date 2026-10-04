@@ -333,11 +333,13 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
           checked={project.settings.showLabels}
           onChange={() => updateChartSettings({ showLabels: !project.settings.showLabels })}
         />
-        <ToggleRow
-          label="Legend"
-          checked={project.settings.showLegend}
-          onChange={() => updateChartSettings({ showLegend: !project.settings.showLegend })}
-        />
+        {project.type === "pie" ? (
+          <ToggleRow
+            label="Legend"
+            checked={project.settings.showLegend}
+            onChange={() => updateChartSettings({ showLegend: !project.settings.showLegend })}
+          />
+        ) : null}
 
         <div className="settings-block">
           <div className="subsection-label">Label content</div>
