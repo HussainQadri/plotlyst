@@ -127,6 +127,39 @@ describe("chart layout math", () => {
     expect(subtotal?.connectorInY).toBe(subtotal?.endY);
   });
 
+  it("keeps scatter bubbles inside the plotting area", () => {
+    const layout = layoutScatter(
+      {
+        points: [
+          { id: "low", label: "Low", x: 0, y: 0, size: 100 },
+          { id: "high", label: "High", x: 10, y: 10, size: 100 }
+        ]
+      },
+      defaultTheme.palette,
+      {},
+      700,
+      360
+    );
+
+    layout.points.forEach((point) => {
+      expect(point.cx - point.r).toBeGreaterThanOrEqual(0);
+      expect(point.cx + point.r).toBeLessThanOrEqual(700);
+      expect(point.cy - point.r).toBeGreaterThanOrEqual(0);
+      expect(point.cy + point.r).toBeLessThanOrEqual(360);
+    });
+  });
+
+  it("keeps the sample portfolio bubbles clear of every plot edge", () => {
+    const layout = layoutScatter(sampleScatterData, defaultTheme.palette, {}, 700, 360);
+
+    layout.points.forEach((point) => {
+      expect(point.cx - point.r).toBeGreaterThanOrEqual(0);
+      expect(point.cx + point.r).toBeLessThanOrEqual(700);
+      expect(point.cy - point.r).toBeGreaterThanOrEqual(0);
+      expect(point.cy + point.r).toBeLessThanOrEqual(360);
+    });
+  });
+
   it("formats small scatter ticks without collapsing distinct values", () => {
     const layout = layoutScatter(
       {
@@ -162,6 +195,26 @@ describe("chart layout math", () => {
     expect(layout.points[0].size).toBe(0);
     expect(layout.xDivider).not.toBe(350);
     expect(layout.yDivider).not.toBe(180);
+  });
+
+  it("keeps default quadrant dividers on the data midpoint when bubbles toggle", () => {
+    const xs = sampleScatterData.points.map((point) => point.x);
+    const midpoint = (Math.min(...xs) + Math.max(...xs)) / 2;
+
+    [true, false].forEach((showBubbles) => {
+      const layout = layoutScatter(sampleScatterData, defaultTheme.palette, {}, 700, 360, { ...defaultScatterSettings(), showBubbles });
+      const dividerValue = layout.xMin + (layout.xDivider / 700) * (layout.xMax - layout.xMin);
+      expect(dividerValue).toBeCloseTo(midpoint, 5);
+    });
+  });
+
+  it("fills the scatter plot instead of padding out to the next coarse tick", () => {
+    const layout = layoutScatter(sampleScatterData, defaultTheme.palette, {}, 700, 360);
+    const centers = layout.points.map((point) => point.cx);
+
+    expect(Math.min(...centers)).toBeLessThan(50);
+    expect(Math.max(...centers)).toBeGreaterThan(700 - 50);
+    expect(layout.xTicks.length).toBeGreaterThanOrEqual(5);
   });
 
   it("keeps a scatter point's colour when an earlier point becomes invalid", () => {

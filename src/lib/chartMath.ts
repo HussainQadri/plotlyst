@@ -590,6 +590,8 @@ export type ScatterLayout = {
 const scatterDotRadius = 6;
 const scatterMinBubbleRadius = 5;
 const scatterMaxBubbleRadius = 30;
+/** Air between the outermost mark and the plot edge, in pixels. */
+const scatterEdgeGap = 10;
 
 export function layoutScatter(
   data: ScatterData,
@@ -604,28 +606,20 @@ export function layoutScatter(
   );
 
   if (pts.length === 0) {
+    const xAxis = scatterAxis(0, 10, 0, width, true);
+    const yAxis = scatterAxis(0, 10, 0, height, false);
     return {
       points: [],
-      xTicks: niceAxisTicks(0, 10, 5, width, true),
-      yTicks: niceAxisTicks(0, 10, 5, height, false),
-      xMin: 0,
-      xMax: 10,
-      yMin: 0,
-      yMax: 10,
+      xTicks: xAxis.ticks,
+      yTicks: yAxis.ticks,
+      xMin: xAxis.min,
+      xMax: xAxis.max,
+      yMin: yAxis.min,
+      yMax: yAxis.max,
       xDivider: width / 2,
       yDivider: height / 2
     };
   }
-
-  const xs = pts.map(({ point }) => point.x);
-  const ys = pts.map(({ point }) => point.y);
-  const xS = niceScale(Math.min(...xs), Math.max(...xs), 5);
-  const yS = niceScale(Math.min(...ys), Math.max(...ys), 5);
-
-  const xRange = xS.max - xS.min || 1;
-  const yRange = yS.max - yS.min || 1;
-  const scaleX = (x: number) => ((x - xS.min) / xRange) * width;
-  const scaleY = (y: number) => height - ((y - yS.min) / yRange) * height;
 
   // Bubble area, not radius, is proportional to size so big values aren't exaggerated.
   const maxSize = Math.max(...pts.map(({ point }) => finitePositive(point.size)), 0);
@@ -634,15 +628,29 @@ export function layoutScatter(
     if (!settings.showBubbles || safeSize === 0 || maxSize === 0) return scatterDotRadius;
     return Math.max(scatterMinBubbleRadius, Math.sqrt(safeSize / maxSize) * scatterMaxBubbleRadius);
   };
+  const radii = pts.map(({ point }) => getRadius(point.size));
+  const edgePadding = Math.max(...radii) + scatterEdgeGap;
 
-  const points: ScatterPointLayout[] = pts.map(({ point, sourceIndex }) => {
+  const xs = pts.map(({ point }) => point.x);
+  const ys = pts.map(({ point }) => point.y);
+  const rawXMin = Math.min(...xs);
+  const rawXMax = Math.max(...xs);
+  const rawYMin = Math.min(...ys);
+  const rawYMax = Math.max(...ys);
+  // Defaulting dividers to the data's midpoint keeps them fixed when bubble padding changes the domain.
+  const xDividerValue = settings.xDivider ?? (rawXMin + rawXMax) / 2;
+  const yDividerValue = settings.yDivider ?? (rawYMin + rawYMax) / 2;
+  const xAxis = scatterAxis(Math.min(rawXMin, xDividerValue), Math.max(rawXMax, xDividerValue), edgePadding, width, true);
+  const yAxis = scatterAxis(Math.min(rawYMin, yDividerValue), Math.max(rawYMax, yDividerValue), edgePadding, height, false);
+
+  const points: ScatterPointLayout[] = pts.map(({ point, sourceIndex }, index) => {
     const ov = getOverride(overrides, point.id);
     return {
       id: point.id,
       label: resolveLabel(point.label, ov),
-      cx: scaleX(point.x),
-      cy: scaleY(point.y),
-      r: getRadius(point.size),
+      cx: xAxis.scale(point.x),
+      cy: yAxis.scale(point.y),
+      r: radii[index],
       color: resolveColor(palette[sourceIndex % palette.length] ?? "#327277", point.color, ov),
       x: point.x,
       y: point.y,
@@ -654,12 +662,12 @@ export function layoutScatter(
 
   return {
     points,
-    xTicks: niceAxisTicks(xS.min, xS.max, xS.step, width, true),
-    yTicks: niceAxisTicks(yS.min, yS.max, yS.step, height, false),
-    xMin: xS.min, xMax: xS.max,
-    yMin: yS.min, yMax: yS.max,
-    xDivider: scaleX(clampToDomain(settings.xDivider ?? (xS.min + xS.max) / 2, xS.min, xS.max)),
-    yDivider: scaleY(clampToDomain(settings.yDivider ?? (yS.min + yS.max) / 2, yS.min, yS.max))
+    xTicks: xAxis.ticks,
+    yTicks: yAxis.ticks,
+    xMin: xAxis.min, xMax: xAxis.max,
+    yMin: yAxis.min, yMax: yAxis.max,
+    xDivider: xAxis.scale(xDividerValue),
+    yDivider: yAxis.scale(yDividerValue)
   };
 }
 
@@ -667,31 +675,42 @@ function finitePositive(value: number | undefined): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function clampToDomain(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+/**
+ * Pads the data extent so the outermost marks clear the plot edge by `padding`
+ * pixels, then places ticks on round values inside that domain. The domain is
+ * not widened out to the next tick, which would strand empty bands of plot.
+ */
+function scatterAxis(
+  dataMin: number,
+  dataMax: number,
+  padding: number,
+  size: number,
+  isX: boolean
+): { min: number; max: number; scale: (value: number) => number; ticks: ScatterAxisTick[] } {
+  let min: number;
+  let max: number;
+  if (dataMax > dataMin) {
+    const usable = Math.max(1, size - padding * 2);
+    const valuePerPixel = (dataMax - dataMin) / usable;
+    min = dataMin - padding * valuePerPixel;
+    max = dataMax + padding * valuePerPixel;
+  } else {
+    const halfSpan = Math.abs(dataMin) > 0 ? Math.abs(dataMin) / 2 : 1;
+    min = dataMin - halfSpan;
+    max = dataMax + halfSpan;
+  }
 
-function niceAxisTicks(min: number, max: number, step: number, size: number, isX: boolean): ScatterAxisTick[] {
+  const range = max - min;
+  const scale = (value: number) => (isX ? ((value - min) / range) * size : size - ((value - min) / range) * size);
+  const targetTicks = Math.max(2, Math.round(size / (isX ? 110 : 66)));
+  const step = niceNumber(range / targetTicks, true);
   const ticks: ScatterAxisTick[] = [];
-  if (!Number.isFinite(step) || step <= 0) return ticks;
-  const range = max - min || 1;
-  const scale = (v: number) => isX ? ((v - min) / range) * size : size - ((v - min) / range) * size;
-  for (let v = min, count = 0; v <= max + step * 0.01 && count < 100; v = roundStepped(v + step), count += 1) {
-    if (v > max + step * 0.1) break;
-    ticks.push({ value: v, position: scale(v), label: formatTickLabel(v, step) });
+  if (Number.isFinite(step) && step > 0) {
+    for (let value = roundStepped(Math.ceil(min / step) * step), count = 0; value <= max && count < 100; value = roundStepped(value + step), count += 1) {
+      ticks.push({ value, position: scale(value), label: formatTickLabel(value, step) });
+    }
   }
-  return ticks;
-}
-
-function niceScale(rawMin: number, rawMax: number, maxTicks: number): { min: number; max: number; step: number } {
-  if (rawMin === rawMax) {
-    const base = Math.abs(rawMin) > 0 ? Math.abs(rawMin) : 1;
-    const step = niceNumber(base * 2 / maxTicks, true) || 1;
-    return { min: rawMin - step * 2, max: rawMax + step * 2, step };
-  }
-  const range = niceNumber(rawMax - rawMin, false);
-  const step = niceNumber(range / maxTicks, true) || Math.max(Math.abs(rawMin), Math.abs(rawMax), 1) / maxTicks;
-  return { min: Math.floor(rawMin / step) * step, max: Math.ceil(rawMax / step) * step, step };
+  return { min, max, scale, ticks };
 }
 
 function niceNumber(value: number, round: boolean): number {
