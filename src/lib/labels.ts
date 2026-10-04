@@ -30,7 +30,8 @@ const defaultValueFormat: NumberFormatSettings = {
 
 export function defaultLabelSettings(type: ChartType): LabelSettings {
   return {
-    fields: type === "pie" ? ["label", "percent"] : type === "scatter" ? ["label"] : ["label", "value"],
+    // The waterfall axis already names every bar, so its bar labels default to the value alone.
+    fields: type === "pie" ? ["label", "percent"] : type === "scatter" ? ["label"] : type === "waterfall" ? ["value"] : ["label", "value"],
     separator: "space",
     valueFormat: {
       ...defaultValueFormat,
@@ -104,8 +105,11 @@ export function normalizeChartSettings(raw: unknown, type: ChartType): ChartSett
   const defaults = defaultChartSettings(type);
   if (!isRecord(raw)) return defaults;
 
+  // Settings saved before label content existed showed the name, plus the value
+  // unless showValues was off. Pinned here so changing a default can't restyle them.
   const oldShowValues = typeof raw.showValues === "boolean" ? raw.showValues : true;
-  const oldFields: LabelContentField[] = oldShowValues ? defaultLabelSettings(type).fields : ["label"];
+  const legacyFields: LabelContentField[] = type === "pie" ? ["label", "percent"] : type === "scatter" ? ["label"] : ["label", "value"];
+  const oldFields: LabelContentField[] = oldShowValues ? legacyFields : ["label"];
   const rawLabelContent = isRecord(raw.labelContent) ? raw.labelContent : null;
 
   return {

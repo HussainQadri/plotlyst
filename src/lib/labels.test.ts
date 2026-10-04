@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLabelLines, defaultChartSettings, formatValue, normalizeChartSettings } from "./labels";
+import { buildLabelLines, defaultChartSettings, defaultLabelSettings, formatValue, normalizeChartSettings } from "./labels";
 import type { NumberFormatSettings } from "./types";
 
 const moneyFormat: NumberFormatSettings = {
@@ -32,6 +32,10 @@ describe("label formatting", () => {
       "42",
       "42.0%"
     ]);
+  });
+
+  it("defaults waterfall bar labels to the value, which the axis doesn't repeat", () => {
+    expect(defaultLabelSettings("waterfall").fields).toEqual(["value"]);
   });
 
   it("normalizes legacy showValues projects into label fields", () => {
