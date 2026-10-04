@@ -590,22 +590,44 @@ export function Inspector({ project, setProject, selectedElement, selectedElemen
             <ToggleRow label="Quadrants" checked={project.settings.scatter.showQuadrants} onChange={() => updateScatterSettings({ showQuadrants: !project.settings.scatter.showQuadrants })} />
             <ToggleRow label="Bubbles" checked={project.settings.scatter.showBubbles} onChange={() => updateScatterSettings({ showBubbles: !project.settings.scatter.showBubbles })} />
             {project.settings.scatter.showQuadrants ? (
-              <div className="field-grid">
-                {(["Top-left", "Top-right", "Bottom-left", "Bottom-right"] as const).map((corner, qi) => (
-                  <label className="field" key={corner}>
-                    <span>{corner}</span>
+              <>
+                <div className="field-grid">
+                  <label className="field">
+                    <span>X divider</span>
                     <input
-                      value={project.settings.scatter.quadrantLabels[qi]}
-                      placeholder={corner}
-                      onChange={(e) => {
-                        const next = [...project.settings.scatter.quadrantLabels] as [string, string, string, string];
-                        next[qi] = e.target.value;
-                        updateScatterSettings({ quadrantLabels: next });
-                      }}
+                      type="number"
+                      value={project.settings.scatter.xDivider ?? ""}
+                      placeholder="Auto"
+                      onChange={(event) => updateScatterSettings({ xDivider: optionalNumber(event.target.value) })}
                     />
                   </label>
-                ))}
-              </div>
+                  <label className="field">
+                    <span>Y divider</span>
+                    <input
+                      type="number"
+                      value={project.settings.scatter.yDivider ?? ""}
+                      placeholder="Auto"
+                      onChange={(event) => updateScatterSettings({ yDivider: optionalNumber(event.target.value) })}
+                    />
+                  </label>
+                </div>
+                <div className="field-grid">
+                  {(["Top-left", "Top-right", "Bottom-left", "Bottom-right"] as const).map((corner, qi) => (
+                    <label className="field" key={corner}>
+                      <span>{corner}</span>
+                      <input
+                        value={project.settings.scatter.quadrantLabels[qi]}
+                        placeholder={corner}
+                        onChange={(e) => {
+                          const next = [...project.settings.scatter.quadrantLabels] as [string, string, string, string];
+                          next[qi] = e.target.value;
+                          updateScatterSettings({ quadrantLabels: next });
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
             ) : null}
           </div>
         ) : null}
@@ -740,6 +762,12 @@ function elementBreadcrumb(project: ChartProject, element: SelectableElement): s
 
 function annotationBreadcrumb(project: ChartProject): string {
   return `Chart / ${chartTypeName(project.type)} / Annotation`;
+}
+
+function optionalNumber(value: string): number | undefined {
+  if (value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 /** A labelled on/off control. role="switch" states the semantics that

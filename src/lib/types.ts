@@ -106,6 +106,8 @@ export type ScatterSettings = {
   showGrid: boolean;
   showQuadrants: boolean;
   showBubbles: boolean;
+  xDivider?: number;
+  yDivider?: number;
   quadrantLabels: [string, string, string, string];
 };
 

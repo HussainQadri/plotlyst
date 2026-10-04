@@ -7,7 +7,9 @@ describe("stored project normalization", () => {
     const project = createSampleProject("scatter");
     project.settings.scatter = {
       ...project.settings.scatter,
-      showQuadrants: true
+      showQuadrants: true,
+      xDivider: 65,
+      yDivider: 25
     };
 
     expect(normalizeStoredProject(project)).toEqual(project);

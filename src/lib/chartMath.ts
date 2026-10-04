@@ -583,6 +583,8 @@ export type ScatterLayout = {
   xMax: number;
   yMin: number;
   yMax: number;
+  xDivider: number;
+  yDivider: number;
 };
 
 export function layoutScatter(
@@ -596,7 +598,17 @@ export function layoutScatter(
   const pts = data.points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
 
   if (pts.length === 0) {
-    return { points: [], xTicks: niceAxisTicks(0, 10, 5, width, true), yTicks: niceAxisTicks(0, 10, 5, height, false), xMin: 0, xMax: 10, yMin: 0, yMax: 10 };
+    return {
+      points: [],
+      xTicks: niceAxisTicks(0, 10, 5, width, true),
+      yTicks: niceAxisTicks(0, 10, 5, height, false),
+      xMin: 0,
+      xMax: 10,
+      yMin: 0,
+      yMax: 10,
+      xDivider: width / 2,
+      yDivider: height / 2
+    };
   }
 
   const xs = pts.map((p) => p.x);
@@ -635,8 +647,14 @@ export function layoutScatter(
     xTicks: niceAxisTicks(xS.min, xS.max, xS.step, width, true),
     yTicks: niceAxisTicks(yS.min, yS.max, yS.step, height, false),
     xMin: xS.min, xMax: xS.max,
-    yMin: yS.min, yMax: yS.max
+    yMin: yS.min, yMax: yS.max,
+    xDivider: scaleX(clampToDomain(settings.xDivider ?? (xS.min + xS.max) / 2, xS.min, xS.max)),
+    yDivider: scaleY(clampToDomain(settings.yDivider ?? (yS.min + yS.max) / 2, yS.min, yS.max))
   };
+}
+
+function clampToDomain(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function niceAxisTicks(min: number, max: number, step: number, size: number, isX: boolean): ScatterAxisTick[] {

@@ -1109,7 +1109,7 @@ function ScatterChart({
   const scatterSettings = project.settings.scatter;
   const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);
   const selectedPoint = selectedId ? layout.points.find((p) => p.id === selectedId) : null;
-  const midX = w / 2, midY = h / 2;
+  const midX = layout.xDivider, midY = layout.yDivider;
 
   return (
     <g transform={`translate(${ox} ${oy})`}>

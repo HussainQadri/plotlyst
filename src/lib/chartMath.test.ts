@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { layoutMarimekko, layoutPie, layoutScatter, layoutWaterfall } from "./chartMath";
-import { defaultWaterfallSettings } from "./labels";
-import { sampleMarimekkoData, samplePieData, sampleWaterfallData } from "./samples";
+import { defaultScatterSettings, defaultWaterfallSettings } from "./labels";
+import { sampleMarimekkoData, samplePieData, sampleScatterData, sampleWaterfallData } from "./samples";
 import { defaultTheme } from "./themes";
 
 describe("chart layout math", () => {
@@ -140,5 +140,13 @@ describe("chart layout math", () => {
 
     expect(new Set(layout.xTicks.map((tick) => tick.label)).size).toBe(layout.xTicks.length);
     expect(layout.xTicks.some((tick) => tick.label !== "0")).toBe(true);
+  });
+
+  it("places configurable quadrant dividers", () => {
+    const settings = { ...defaultScatterSettings(), showQuadrants: true, xDivider: 70, yDivider: 20 };
+    const layout = layoutScatter(sampleScatterData, defaultTheme.palette, {}, 700, 360, settings);
+
+    expect(layout.xDivider).not.toBe(350);
+    expect(layout.yDivider).not.toBe(180);
   });
 });

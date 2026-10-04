@@ -57,6 +57,8 @@ export function defaultScatterSettings(): ScatterSettings {
     showGrid: true,
     showQuadrants: false,
     showBubbles: true,
+    xDivider: undefined,
+    yDivider: undefined,
     quadrantLabels: ["", "", "", ""]
   };
 }
@@ -287,6 +289,8 @@ function normalizeScatterSettings(raw: unknown, fallback: ScatterSettings): Scat
     showGrid: typeof raw.showGrid === "boolean" ? raw.showGrid : fallback.showGrid,
     showQuadrants: typeof raw.showQuadrants === "boolean" ? raw.showQuadrants : fallback.showQuadrants,
     showBubbles: typeof raw.showBubbles === "boolean" ? raw.showBubbles : fallback.showBubbles,
+    xDivider: finiteNumberOrUndefined(raw.xDivider),
+    yDivider: finiteNumberOrUndefined(raw.yDivider),
     quadrantLabels: [
       typeof rawQ[0] === "string" ? rawQ[0] : fallback.quadrantLabels[0],
       typeof rawQ[1] === "string" ? rawQ[1] : fallback.quadrantLabels[1],
@@ -294,6 +298,11 @@ function normalizeScatterSettings(raw: unknown, fallback: ScatterSettings): Scat
       typeof rawQ[3] === "string" ? rawQ[3] : fallback.quadrantLabels[3]
     ]
   };
+}
+
+function finiteNumberOrUndefined(raw: unknown): number | undefined {
+  const value = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeSankeyAlign(raw: unknown, fallback: SankeyAlign): SankeyAlign {
