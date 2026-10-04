@@ -2,7 +2,7 @@
 
 import { Plus, Table2, Trash2 } from "lucide-react";
 import { parseDelimited, toNumber } from "@/lib/csv";
-import { isCalculatedWaterfallKind, normalizeWaterfallKind } from "@/lib/datasheet";
+import { isCalculatedWaterfallKind, normalizeWaterfallKind, parseScatterSheet } from "@/lib/datasheet";
 import type {
   ChartProject,
   MarimekkoColumn,
@@ -637,9 +637,16 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
     setSelectedId(null);
   }
 
+  function pastePoints(text: string) {
+    const parsed = parseScatterSheet(text, makeId);
+    if (!parsed) return;
+    setProject((current) => ({ ...current, data: parsed, visualOverrides: {}, annotations: [] }));
+    setSelectedId(null);
+  }
+
   return (
     <>
-      <table className="data-table">
+      <table className="data-table" onPaste={(event) => handlePaste(event, pastePoints)}>
         <thead>
           <tr>
             <th>Label</th>
