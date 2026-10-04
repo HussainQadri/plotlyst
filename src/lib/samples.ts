@@ -104,6 +104,14 @@ export function createSampleProject(type: ChartType): ChartProject {
     : type === "sankey" ? "Revenue Flow"
     : type === "scatter" ? "Portfolio Analysis"
     : "Revenue Bridge";
+  const settings = defaultChartSettings(type);
+  if (type === "scatter") {
+    settings.scatter = {
+      ...settings.scatter,
+      xLabel: "Market attractiveness",
+      yLabel: "Growth rate (%)"
+    };
+  }
 
   return {
     id: `project-${type}`,
@@ -111,7 +119,7 @@ export function createSampleProject(type: ChartType): ChartProject {
     type,
     theme: defaultTheme,
     data,
-    settings: defaultChartSettings(type),
+    settings,
     visualOverrides: {},
     annotations: []
   };
