@@ -38,6 +38,12 @@ describe("datasheet parsing", () => {
     ]);
   });
 
+  it("treats any non-numeric first row as a scatter header", () => {
+    const data = parseScatterSheet("Product,Share,Growth\nCloud,78,24\nCRM,55,8", makeId);
+
+    expect(data?.points.map((point) => point.label)).toEqual(["Cloud", "CRM"]);
+  });
+
   it("parses numeric cells without committing half-typed values", () => {
     expect(parseNumberDraft("42.5")).toBe(42.5);
     expect(parseNumberDraft("-3")).toBe(-3);

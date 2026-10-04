@@ -59,8 +59,8 @@ export function parseScatterSheet(text: string, makeId: IdFactory): ScatterData 
   const rows = parseDelimited(text);
   if (rows.length === 0) return null;
 
-  const firstRow = rows[0].map((cell) => cell.trim().toLowerCase());
-  const hasHeader = firstRow.includes("x") && firstRow.includes("y");
+  // Any first row whose X and Y cells aren't numbers is a header, whatever the columns are called.
+  const hasHeader = !isNumericCell(rows[0][1]) && !isNumericCell(rows[0][2]);
   const body = hasHeader ? rows.slice(1) : rows;
   if (body.length === 0) return null;
 
@@ -76,6 +76,11 @@ export function parseScatterSheet(text: string, makeId: IdFactory): ScatterData 
       };
     })
   };
+}
+
+function isNumericCell(cell: string | undefined): boolean {
+  const cleaned = (cell ?? "").replace(/[$,%\s]/g, "");
+  return cleaned !== "" && Number.isFinite(Number(cleaned));
 }
 
 /**
