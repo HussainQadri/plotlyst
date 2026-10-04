@@ -10,6 +10,13 @@ describe("project envelopes", () => {
     expect(normalizeProjectEnvelope(envelope)).toEqual(envelope);
   });
 
+  it("normalizes shared scatter projects", () => {
+    const project = createSampleProject("scatter");
+    const envelope = createProjectEnvelope(project, new Date("2026-06-19T10:00:00.000Z"));
+
+    expect(normalizeProjectEnvelope(envelope)).toEqual(envelope);
+  });
+
   it("rejects malformed envelopes", () => {
     expect(normalizeProjectEnvelope({ schemaVersion: 1, project: { type: "bad" } })).toBeNull();
     expect(normalizeProjectEnvelope({ schemaVersion: 2, project: createSampleProject("pie") })).toBeNull();

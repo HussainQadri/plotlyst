@@ -1,4 +1,4 @@
-import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, WaterfallData } from "./types";
+import type { Annotation, ChartProject, ChartType, MarimekkoData, PieData, SankeyData, ScatterData, WaterfallData } from "./types";
 import { normalizeChartSettings } from "./labels";
 import { defaultTheme, themes } from "./themes";
 
@@ -33,12 +33,26 @@ export function isWaterfallData(type: ChartType, data: unknown): data is Waterfa
   return type === "waterfall" && typeof data === "object" && data !== null && "rows" in data;
 }
 
+export function isSankeyData(type: ChartType, data: unknown): data is SankeyData {
+  return type === "sankey" && typeof data === "object" && data !== null && "nodes" in data && "links" in data;
+}
+
+export function isScatterData(type: ChartType, data: unknown): data is ScatterData {
+  return type === "scatter" && typeof data === "object" && data !== null && "points" in data;
+}
+
 export function normalizeStoredProject(raw: unknown): ChartProject | null {
   if (!isRecord(raw)) return null;
   const type = raw.type;
-  if (type !== "pie" && type !== "marimekko" && type !== "waterfall") return null;
+  if (type !== "pie" && type !== "marimekko" && type !== "waterfall" && type !== "sankey" && type !== "scatter") return null;
   const data = raw.data;
-  if (!isPieData(type, data) && !isMarimekkoData(type, data) && !isWaterfallData(type, data)) return null;
+  if (
+    !isPieData(type, data) &&
+    !isMarimekkoData(type, data) &&
+    !isWaterfallData(type, data) &&
+    !isSankeyData(type, data) &&
+    !isScatterData(type, data)
+  ) return null;
 
   return {
     id: typeof raw.id === "string" ? raw.id : `project-${type}`,
