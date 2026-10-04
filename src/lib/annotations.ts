@@ -1,4 +1,4 @@
-import { layoutMarimekko, layoutPie, layoutSankey, layoutScatter, layoutWaterfall } from "./chartMath";
+import { layoutMarimekko, layoutPie, layoutSankey, layoutScatter, layoutWaterfall, scatterPlotFrame } from "./chartMath";
 import type { Annotation, ChartProject, MarimekkoData, PieData, SankeyData, ScatterData, WaterfallData } from "./types";
 
 export type AnnotationAnchor = {
@@ -26,7 +26,7 @@ export type ResolvedAnnotation = {
 const pieCenter = { x: 360, y: 286 };
 const pieRadius = 142;
 const plot = { x: 112, y: 104, width: 736 };
-const scatterPlot = { x: 120, y: 55, width: 700, height: 360 };
+const scatterPlot = scatterPlotFrame;
 const sankeyPlot = { x: 90, y: 70, width: 780, height: 390 };
 
 export function resolveAnnotations(project: ChartProject): ResolvedAnnotation[] {

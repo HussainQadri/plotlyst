@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveAnnotationAnchor, resolveAnnotations } from "./annotations";
+import { scatterPlotFrame } from "./chartMath";
 import { createSampleProject } from "./samples";
 import type { WaterfallData } from "./types";
 
@@ -41,9 +42,9 @@ describe("annotation anchors", () => {
 
     expect(resolved).toHaveLength(1);
     expect(resolved[0].anchor.id).toBe("sc-cloud");
-    expect(resolved[0].anchor.x).toBeGreaterThan(120);
-    expect(resolved[0].anchor.x).toBeLessThan(820);
-    expect(resolved[0].anchor.y).toBeGreaterThan(55);
-    expect(resolved[0].anchor.y).toBeLessThan(415);
+    expect(resolved[0].anchor.x).toBeGreaterThan(scatterPlotFrame.x);
+    expect(resolved[0].anchor.x).toBeLessThan(scatterPlotFrame.x + scatterPlotFrame.width);
+    expect(resolved[0].anchor.y).toBeGreaterThan(scatterPlotFrame.y);
+    expect(resolved[0].anchor.y).toBeLessThan(scatterPlotFrame.y + scatterPlotFrame.height);
   });
 });

@@ -11,6 +11,7 @@ import {
   layoutSankey,
   layoutScatter,
   layoutWaterfall,
+  scatterPlotFrame,
   type MarimekkoSegmentLayout,
   type PieSliceLayout,
   type WaterfallBarLayout
@@ -1104,7 +1105,7 @@ function ScatterChart({
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
-  const ox = 120, oy = 55, w = 700, h = 360;
+  const { x: ox, y: oy, width: w, height: h } = scatterPlotFrame;
   const data = project.data as ScatterData;
   const scatterSettings = project.settings.scatter;
   const layout = layoutScatter(data, project.theme.palette, project.visualOverrides, w, h, scatterSettings);

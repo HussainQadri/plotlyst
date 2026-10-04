@@ -587,6 +587,9 @@ export type ScatterLayout = {
   yDivider: number;
 };
 
+/** Plot area inside the 960×540 slide, shared by the renderer and annotations. */
+export const scatterPlotFrame = { x: 112, y: 108, width: 736, height: 322 };
+
 const scatterDotRadius = 6;
 const scatterMinBubbleRadius = 5;
 const scatterMaxBubbleRadius = 30;
@@ -597,8 +600,8 @@ export function layoutScatter(
   data: ScatterData,
   palette: string[],
   overrides: Record<string, VisualOverride> = {},
-  width = 700,
-  height = 360,
+  width = scatterPlotFrame.width,
+  height = scatterPlotFrame.height,
   settings: ScatterSettings = defaultScatterSettings()
 ): ScatterLayout {
   const pts = data.points.flatMap((point, sourceIndex) =>
