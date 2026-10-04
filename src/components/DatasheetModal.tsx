@@ -14,6 +14,7 @@ import {
 } from "@/lib/datasheet";
 import type {
   ChartProject,
+  ChartType,
   MarimekkoColumn,
   MarimekkoData,
   PieData,
@@ -34,6 +35,11 @@ type CellPosition = {
   row: number;
   col: number;
 };
+
+/** Sankey has no sheet view yet; its nodes and links are edited in the data panel. */
+export function hasDatasheet(type: ChartType): boolean {
+  return type !== "sankey";
+}
 
 export function DatasheetModal({ project, setProject, setSelectedId, onClose }: DatasheetModalProps) {
   const dialogRef = useFocusTrap<HTMLElement>(true);

@@ -33,7 +33,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCanvas } from "./ChartCanvas";
 import { DataPanel } from "./DataPanel";
-import { DatasheetModal } from "./DatasheetModal";
+import { DatasheetModal, hasDatasheet } from "./DatasheetModal";
 import { Inspector } from "./Inspector";
 import { CommandPalette, type Command as PaletteCommand } from "./ui/CommandPalette";
 import { Menu, type MenuItem } from "./ui/Menu";
@@ -629,7 +629,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
       disabled: project.type === chart.id,
       run: () => switchChartType(chart.id)
     })),
-    { id: "datasheet", group: "Data", label: "Open datasheet", icon: Table2, run: () => setDatasheetOpen(true) },
+    { id: "datasheet", group: "Data", label: "Open datasheet", icon: Table2, disabled: !hasDatasheet(project.type), run: () => setDatasheetOpen(true) },
     { id: "reset-data", group: "Data", label: "Reset chart data", icon: RefreshCcw, run: resetData },
     { id: "reset-visual", group: "Data", label: "Reset visual edits", icon: Palette, run: resetVisualEdits },
     { id: "undo", group: "History", label: "Undo", icon: Undo2, hint: "⌘Z", disabled: history.past.length === 0, run: undo },
@@ -762,7 +762,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
   const overflowItems: MenuItem[] = [
     { kind: "heading", id: "h-data", label: "Data" },
-    { id: "m-datasheet", label: "Open datasheet", icon: Table2, onSelect: () => setDatasheetOpen(true) },
+    { id: "m-datasheet", label: "Open datasheet", icon: Table2, disabled: !hasDatasheet(project.type), onSelect: () => setDatasheetOpen(true) },
     { id: "m-reset-visual", label: "Reset visual edits", icon: Palette, onSelect: resetVisualEdits },
     { id: "m-reset-data", label: "Reset chart data", icon: RefreshCcw, onSelect: resetData },
     { kind: "separator", id: "s-1" },
@@ -910,15 +910,17 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
 
           <span className="rail-divider" aria-hidden="true" />
 
-          <button
-            type="button"
-            className="rail-button has-tip"
-            aria-label="Open datasheet"
-            data-tip="Datasheet"
-            onClick={() => setDatasheetOpen(true)}
-          >
-            <Table2 size={17} aria-hidden="true" />
-          </button>
+          {hasDatasheet(project.type) ? (
+            <button
+              type="button"
+              className="rail-button has-tip"
+              aria-label="Open datasheet"
+              data-tip="Datasheet"
+              onClick={() => setDatasheetOpen(true)}
+            >
+              <Table2 size={17} aria-hidden="true" />
+            </button>
+          ) : null}
 
           <span className="icon-rail-spacer" />
 
@@ -948,15 +950,17 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
           <div className="panel-head">
             <h2>{activeChartType.label} data</h2>
             <div className="panel-head-meta">
-              <button
-                className="table-icon has-tip tip-below-end"
-                type="button"
-                onClick={() => setDatasheetOpen(true)}
-                aria-label="Open datasheet"
-                data-tip="Datasheet"
-              >
-                <Table2 size={14} aria-hidden="true" />
-              </button>
+              {hasDatasheet(project.type) ? (
+                <button
+                  className="table-icon has-tip tip-below-end"
+                  type="button"
+                  onClick={() => setDatasheetOpen(true)}
+                  aria-label="Open datasheet"
+                  data-tip="Datasheet"
+                >
+                  <Table2 size={14} aria-hidden="true" />
+                </button>
+              ) : null}
               <button
                 className="table-icon panel-collapse"
                 type="button"
@@ -1249,7 +1253,7 @@ export function ChartEditor({ initialProject }: { initialProject?: ChartProject 
         </aside>
       </div>
 
-      {datasheetOpen ? (
+      {datasheetOpen && hasDatasheet(project.type) ? (
         <DatasheetModal
           project={project}
           setProject={commitProject}
