@@ -2,6 +2,7 @@
 
 import { ArrowRight, Plus, Table2, Trash2 } from "lucide-react";
 import { parseDelimited, toNumber } from "@/lib/csv";
+import { layoutWaterfall } from "@/lib/chartMath";
 import { isCalculatedWaterfallKind, normalizeWaterfallKind, parseScatterSheet } from "@/lib/datasheet";
 import { NumberField } from "./ui/NumberField";
 import type {
@@ -377,6 +378,12 @@ function MarimekkoDataEditor({ project, setProject, setSelectedId }: DataPanelPr
 
 function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelProps) {
   const data = project.data as WaterfallData;
+  const amountLocked = (row: WaterfallData["rows"][number]) =>
+    isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount";
+  // Calculated subtotals and totals show the running total the chart draws, not their unused amount.
+  const calculatedTotals = new Map(
+    layoutWaterfall(data, project.theme.palette, {}, 736, 320, project.settings.waterfall).map((bar) => [bar.id, bar.displayValue])
+  );
 
   function updateAmount(id: string, amount: number) {
     setProject((current) => ({
@@ -468,16 +475,13 @@ function WaterfallDataEditor({ project, setProject, setSelectedId }: DataPanelPr
             </div>
             <div className="row-card-controls">
               <NumberField
-                value={row.amount}
-                disabled={isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"}
+                value={amountLocked(row) ? calculatedTotals.get(row.id) ?? row.amount : row.amount}
+                disabled={amountLocked(row)}
+                className={amountLocked(row) ? "calculated-value" : undefined}
                 onFocus={() => setSelectedId(row.id)}
                 onCommit={(amount) => updateAmount(row.id, amount)}
                 aria-label={`${row.label} amount`}
-                title={
-                  isCalculatedWaterfallKind(row.kind) && project.settings.waterfall.totalLabelMode !== "amount"
-                    ? "Calculated from the running total"
-                    : undefined
-                }
+                title={amountLocked(row) ? "Calculated from the running total" : undefined}
               />
               <select
                 value={row.kind}

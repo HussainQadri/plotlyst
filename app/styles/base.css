@@ -62,6 +62,13 @@ select:disabled {
   opacity: 0.45;
 }
 
+/* A locked field that still reports a computed value (a waterfall total) stays legible. */
+input.calculated-value:disabled {
+  opacity: 1;
+  color: var(--fg-muted);
+  background: var(--bg-hover);
+}
+
 a {
   color: var(--accent);
   text-decoration: none;

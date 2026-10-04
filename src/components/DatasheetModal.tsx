@@ -2,6 +2,7 @@
 
 import { Columns3, Plus, Trash2, X } from "lucide-react";
 import { useMemo } from "react";
+import { layoutWaterfall } from "@/lib/chartMath";
 import { NumberField } from "./ui/NumberField";
 import { useFocusTrap } from "./ui/useFocusTrap";
 import {
@@ -186,6 +187,10 @@ function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModa
 
 function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModalProps, "onClose">) {
   const data = project.data as WaterfallData;
+  // Calculated subtotals and totals show the running total the chart draws, not their unused amount.
+  const calculatedTotals = new Map(
+    layoutWaterfall(data, project.theme.palette, {}, 736, 320, project.settings.waterfall).map((bar) => [bar.id, bar.displayValue])
+  );
 
   function updateAmount(id: string, amount: number) {
     setProject((current) => ({
@@ -280,8 +285,9 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                   </td>
                   <td>
                     <SheetNumberInput
-                      value={row.amount}
+                      value={amountLocked ? calculatedTotals.get(row.id) ?? row.amount : row.amount}
                       disabled={amountLocked}
+                      className={amountLocked ? "calculated-value" : undefined}
                       position={{ row: rowIndex, col: 1 }}
                       onFocus={() => setSelectedId(row.id)}
                       onCommit={(amount) => updateAmount(row.id, amount)}
@@ -644,12 +650,14 @@ function SheetInput({
 function SheetNumberInput({
   value,
   disabled,
+  className,
   position,
   onFocus,
   onCommit
 }: {
   value: number;
   disabled?: boolean;
+  className?: string;
   position: CellPosition;
   onFocus?: () => void;
   onCommit: (value: number) => void;
@@ -659,6 +667,7 @@ function SheetNumberInput({
       data-sheet-cell={`${position.row}:${position.col}`}
       value={value}
       disabled={disabled}
+      className={className}
       onFocus={onFocus}
       onKeyDown={(event) => handleSheetKeyDown(event, position)}
       onCommit={onCommit}
