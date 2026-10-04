@@ -8,6 +8,7 @@ import {
   normalizeWaterfallKind,
   parseMarimekkoMatrix,
   parsePieSheet,
+  parseScatterSheet,
   parseWaterfallSheet
 } from "@/lib/datasheet";
 import type {
@@ -15,6 +16,7 @@ import type {
   MarimekkoColumn,
   MarimekkoData,
   PieData,
+  ScatterData,
   WaterfallData,
   WaterfallKind
 } from "@/lib/types";
@@ -71,6 +73,9 @@ export function DatasheetModal({ project, setProject, setSelectedId, onClose }: 
         ) : null}
         {project.type === "marimekko" && "columns" in project.data ? (
           <MarimekkoDatasheet project={project} setProject={setProject} setSelectedId={setSelectedId} />
+        ) : null}
+        {project.type === "scatter" && "points" in project.data ? (
+          <ScatterDatasheet project={project} setProject={setProject} setSelectedId={setSelectedId} />
         ) : null}
       </section>
     </div>
@@ -290,6 +295,126 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModalProps, "onClose">) {
+  const data = project.data as ScatterData;
+
+  function updatePoint(id: string, field: "label" | "x" | "y" | "size", value: string) {
+    setProject((current) => ({
+      ...current,
+      data: {
+        points: (current.data as ScatterData).points.map((point) =>
+          point.id === id ? { ...point, [field]: field === "label" ? value : Number(value) } : point
+        )
+      }
+    }));
+  }
+
+  function addPoint() {
+    const id = makeId("scatter");
+    setProject((current) => {
+      const points = (current.data as ScatterData).points;
+      const offset = points.length * 5;
+      return {
+        ...current,
+        data: { points: [...points, { id, label: "New point", x: 50 + offset, y: 50 + offset, size: 100 }] }
+      };
+    });
+    setSelectedId(id);
+  }
+
+  function removePoint(id: string) {
+    setProject((current) => ({
+      ...current,
+      visualOverrides: omitOverrides(current.visualOverrides, [id]),
+      annotations: current.annotations.filter((annotation) => !annotation.anchorIds.includes(id)),
+      data: { points: (current.data as ScatterData).points.filter((point) => point.id !== id) }
+    }));
+    setSelectedId(null);
+  }
+
+  function pasteSheet(text: string) {
+    const parsed = parseScatterSheet(text, makeId);
+    if (!parsed) return;
+    setProject((current) => ({ ...current, data: parsed, visualOverrides: {}, annotations: [] }));
+    setSelectedId(null);
+  }
+
+  return (
+    <>
+      <div className="datasheet-toolbar">
+        <span className="status-chip plain numeric">{data.points.length} points</span>
+        <span className="quiet">Paste columns in Label, X, Y, Size order.</span>
+        <span className="toolbar-spacer" />
+        <button className="action-button ghost" type="button" onClick={addPoint}>
+          <Plus size={14} aria-hidden="true" />
+          Point
+        </button>
+      </div>
+      <div className="sheet-grid-wrap">
+        <table className="sheet-table scatter-sheet" onPaste={(event) => handleSheetPaste(event, pasteSheet)}>
+          <thead>
+            <tr>
+              <th className="sheet-index" />
+              <th>Label</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>Size</th>
+              <th className="sheet-action-col" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {data.points.map((point, rowIndex) => (
+              <tr key={point.id}>
+                <th className="sheet-index">{rowIndex + 1}</th>
+                <td>
+                  <SheetInput
+                    value={point.label}
+                    position={{ row: rowIndex, col: 0 }}
+                    onFocus={() => setSelectedId(point.id)}
+                    onChange={(value) => updatePoint(point.id, "label", value)}
+                  />
+                </td>
+                <td>
+                  <SheetInput
+                    type="number"
+                    value={point.x}
+                    position={{ row: rowIndex, col: 1 }}
+                    onFocus={() => setSelectedId(point.id)}
+                    onChange={(value) => updatePoint(point.id, "x", value)}
+                  />
+                </td>
+                <td>
+                  <SheetInput
+                    type="number"
+                    value={point.y}
+                    position={{ row: rowIndex, col: 2 }}
+                    onFocus={() => setSelectedId(point.id)}
+                    onChange={(value) => updatePoint(point.id, "y", value)}
+                  />
+                </td>
+                <td>
+                  <SheetInput
+                    type="number"
+                    value={point.size ?? ""}
+                    position={{ row: rowIndex, col: 3 }}
+                    onFocus={() => setSelectedId(point.id)}
+                    onChange={(value) => updatePoint(point.id, "size", value)}
+                  />
+                </td>
+                <td>
+                  <button className="table-icon danger" type="button" onClick={() => removePoint(point.id)} aria-label={`Delete point ${rowIndex + 1}`}>
+                    <Trash2 size={13} aria-hidden="true" />
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -563,6 +688,7 @@ function firstSegmentLabel(data: MarimekkoData, segmentIndex: number): string {
 function datasheetTitle(project: ChartProject): string {
   if (project.type === "pie") return "Pie data";
   if (project.type === "marimekko") return "Marimekko matrix";
+  if (project.type === "scatter") return "Scatter data";
   return "Waterfall bridge";
 }
 
