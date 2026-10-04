@@ -1198,6 +1198,17 @@ function ScatterChart({
         </text>
       ) : null}
 
+      {layout.points.length === 0 ? (
+        <g aria-hidden="true">
+          <text x={w / 2} y={h / 2 - 4} textAnchor="middle" className="svg-note" fill={project.theme.foreground}>
+            {data.points.length === 0 ? "Add points to begin" : "Enter numeric X and Y values"}
+          </text>
+          <text x={w / 2} y={h / 2 + 17} textAnchor="middle" className="svg-axis" fill={project.theme.muted}>
+            Use the data panel or open the datasheet.
+          </text>
+        </g>
+      ) : null}
+
       <g className="scatter-marks">
         {orderedPoints.map((point) => {
           const selected = selectedIds.includes(point.id);
