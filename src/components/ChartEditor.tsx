@@ -1331,7 +1331,17 @@ function addChartElementAfter(project: ChartProject, id: string): ChartProject {
   if (project.type === "scatter") {
     const newId = makeId("sc");
     const d = project.data as ScatterData;
-    return { ...project, data: { points: [...d.points, { id: newId, label: "New point", x: 50, y: 50, size: 100 }] } };
+    const sourceIndex = d.points.findIndex((point) => point.id === id);
+    const source = d.points[sourceIndex] ?? d.points.at(-1);
+    const points = [...d.points];
+    points.splice(sourceIndex >= 0 ? sourceIndex + 1 : points.length, 0, {
+      id: newId,
+      label: "New point",
+      x: (source?.x ?? 45) + 5,
+      y: (source?.y ?? 45) + 5,
+      size: source?.size ?? 100
+    });
+    return { ...project, data: { points } };
   }
 
   return project;

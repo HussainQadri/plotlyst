@@ -624,7 +624,25 @@ function ScatterDataEditor({ project, setProject, setSelectedId }: DataPanelProp
 
   function addPoint() {
     const id = makeId("sc");
-    setProject((c) => ({ ...c, data: { points: [...(c.data as ScatterData).points, { id, label: "New point", x: 50, y: 50, size: 100 }] } }));
+    setProject((current) => {
+      const points = (current.data as ScatterData).points;
+      const source = points.at(-1);
+      return {
+        ...current,
+        data: {
+          points: [
+            ...points,
+            {
+              id,
+              label: "New point",
+              x: (source?.x ?? 45) + 5,
+              y: (source?.y ?? 45) + 5,
+              size: source?.size ?? 100
+            }
+          ]
+        }
+      };
+    });
     setSelectedId(id);
   }
 
