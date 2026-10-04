@@ -91,13 +91,11 @@ export function DatasheetModal({ project, setProject, setSelectedId, onClose }: 
 function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModalProps, "onClose">) {
   const data = project.data as PieData;
 
-  function updateRow(id: string, field: "label" | "value", value: string) {
+  function updateRow(id: string, patch: { label?: string; value?: number }) {
     setProject((current) => ({
       ...current,
       data: {
-        rows: (current.data as PieData).rows.map((row) =>
-          row.id === id ? { ...row, [field]: field === "value" ? Number(value) : value } : row
-        )
+        rows: (current.data as PieData).rows.map((row) => (row.id === id ? { ...row, ...patch } : row))
       }
     }));
   }
@@ -155,16 +153,15 @@ function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModa
                     value={row.label}
                     position={{ row: rowIndex, col: 0 }}
                     onFocus={() => setSelectedId(row.id)}
-                    onChange={(value) => updateRow(row.id, "label", value)}
+                    onChange={(label) => updateRow(row.id, { label })}
                   />
                 </td>
                 <td>
-                  <SheetInput
-                    type="number"
+                  <SheetNumberInput
                     value={row.value}
                     position={{ row: rowIndex, col: 1 }}
                     onFocus={() => setSelectedId(row.id)}
-                    onChange={(value) => updateRow(row.id, "value", value)}
+                    onCommit={(value) => updateRow(row.id, { value })}
                   />
                 </td>
                 <td>
@@ -184,13 +181,19 @@ function PieDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModa
 function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<DatasheetModalProps, "onClose">) {
   const data = project.data as WaterfallData;
 
-  function updateRow(id: string, field: "label" | "amount" | "kind", value: string) {
+  function updateAmount(id: string, amount: number) {
+    setProject((current) => ({
+      ...current,
+      data: { rows: (current.data as WaterfallData).rows.map((row) => (row.id === id ? { ...row, amount } : row)) }
+    }));
+  }
+
+  function updateRow(id: string, field: "label" | "kind", value: string) {
     setProject((current) => ({
       ...current,
       data: {
         rows: (current.data as WaterfallData).rows.map((row) => {
           if (row.id !== id) return row;
-          if (field === "amount") return { ...row, amount: Number(value) };
           if (field === "kind") {
             const kind = normalizeWaterfallKind(value) ?? "change";
             return { ...row, kind, amount: isCalculatedWaterfallKind(kind) ? 0 : row.amount };
@@ -270,13 +273,12 @@ function WaterfallDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                     />
                   </td>
                   <td>
-                    <SheetInput
-                      type="number"
+                    <SheetNumberInput
                       value={row.amount}
                       disabled={amountLocked}
                       position={{ row: rowIndex, col: 1 }}
                       onFocus={() => setSelectedId(row.id)}
-                      onChange={(value) => updateRow(row.id, "amount", value)}
+                      onCommit={(amount) => updateAmount(row.id, amount)}
                     />
                   </td>
                   <td>
@@ -386,19 +388,17 @@ function ScatterDatasheet({ project, setProject, setSelectedId }: Omit<Datasheet
                   />
                 </td>
                 <td>
-                  <NumberField
+                  <SheetNumberInput
                     value={point.x}
-                    data-sheet-cell={`${rowIndex}:1`}
-                    onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 1 })}
+                    position={{ row: rowIndex, col: 1 }}
                     onFocus={() => setSelectedId(point.id)}
                     onCommit={(x) => updatePoint(point.id, { x })}
                   />
                 </td>
                 <td>
-                  <NumberField
+                  <SheetNumberInput
                     value={point.y}
-                    data-sheet-cell={`${rowIndex}:2`}
-                    onKeyDown={(event) => handleSheetKeyDown(event, { row: rowIndex, col: 2 })}
+                    position={{ row: rowIndex, col: 2 }}
                     onFocus={() => setSelectedId(point.id)}
                     onCommit={(y) => updatePoint(point.id, { y })}
                   />
@@ -457,7 +457,7 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
     }));
   }
 
-  function updateSegmentValue(columnId: string, segmentIndex: number, value: string) {
+  function updateSegmentValue(columnId: string, segmentIndex: number, value: number) {
     setProject((current) => ({
       ...current,
       data: {
@@ -466,7 +466,7 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
           return {
             ...column,
             segments: column.segments.map((segment, index) =>
-              index === segmentIndex ? { ...segment, value: Number(value) } : segment
+              index === segmentIndex ? { ...segment, value } : segment
             )
           };
         })
@@ -587,14 +587,13 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
                   const segment = column.segments[segmentIndex];
                   return (
                     <td key={`${column.id}-${segment?.id ?? segmentIndex}`}>
-                      <SheetInput
-                        type="number"
+                      <SheetNumberInput
                         value={segment?.value ?? 0}
                         position={{ row: segmentIndex + 1, col: columnIndex + 1 }}
                         onFocus={() => {
                           if (segment) setSelectedId(segment.id);
                         }}
-                        onChange={(value) => updateSegmentValue(column.id, segmentIndex, value)}
+                        onCommit={(value) => updateSegmentValue(column.id, segmentIndex, value)}
                       />
                     </td>
                   );
@@ -615,15 +614,11 @@ function MarimekkoDatasheet({ project, setProject, setSelectedId }: Omit<Datashe
 
 function SheetInput({
   value,
-  type = "text",
-  disabled,
   position,
   onFocus,
   onChange
 }: {
-  value: string | number;
-  type?: "text" | "number";
-  disabled?: boolean;
+  value: string;
   position: CellPosition;
   onFocus?: () => void;
   onChange: (value: string) => void;
@@ -631,12 +626,36 @@ function SheetInput({
   return (
     <input
       data-sheet-cell={`${position.row}:${position.col}`}
-      type={type}
-      disabled={disabled}
       value={value}
       onFocus={onFocus}
       onKeyDown={(event) => handleSheetKeyDown(event, position)}
       onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
+/** A required number cell: commits only parseable values, with the sheet's Tab/Enter navigation. */
+function SheetNumberInput({
+  value,
+  disabled,
+  position,
+  onFocus,
+  onCommit
+}: {
+  value: number;
+  disabled?: boolean;
+  position: CellPosition;
+  onFocus?: () => void;
+  onCommit: (value: number) => void;
+}) {
+  return (
+    <NumberField
+      data-sheet-cell={`${position.row}:${position.col}`}
+      value={value}
+      disabled={disabled}
+      onFocus={onFocus}
+      onKeyDown={(event) => handleSheetKeyDown(event, position)}
+      onCommit={onCommit}
     />
   );
 }
