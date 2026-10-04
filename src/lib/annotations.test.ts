@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveAnnotationAnchor, resolveAnnotations } from "./annotations";
-import { scatterPlotFrame } from "./chartMath";
+import { sankeyPlotFrame, scatterPlotFrame } from "./chartMath";
 import { createSampleProject } from "./samples";
 import type { WaterfallData } from "./types";
 
@@ -46,5 +46,20 @@ describe("annotation anchors", () => {
     expect(resolved[0].anchor.x).toBeLessThan(scatterPlotFrame.x + scatterPlotFrame.width);
     expect(resolved[0].anchor.y).toBeGreaterThan(scatterPlotFrame.y);
     expect(resolved[0].anchor.y).toBeLessThan(scatterPlotFrame.y + scatterPlotFrame.height);
+  });
+
+  it("anchors Sankey callouts inside the Sankey plot", () => {
+    const project = {
+      ...createSampleProject("sankey"),
+      annotations: [{ id: "ann-sankey", type: "callout" as const, anchorIds: ["sk-services"], label: "Watch", visible: true }]
+    };
+
+    const [resolved] = resolveAnnotations(project);
+
+    expect(resolved.anchor.id).toBe("sk-services");
+    expect(resolved.anchor.x).toBeGreaterThan(sankeyPlotFrame.x);
+    expect(resolved.anchor.x).toBeLessThan(sankeyPlotFrame.x + sankeyPlotFrame.width);
+    expect(resolved.anchor.y).toBeGreaterThan(sankeyPlotFrame.y);
+    expect(resolved.anchor.y).toBeLessThan(sankeyPlotFrame.y + sankeyPlotFrame.height);
   });
 });

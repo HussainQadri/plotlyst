@@ -11,6 +11,7 @@ import {
   layoutSankey,
   layoutScatter,
   layoutWaterfall,
+  sankeyPlotFrame,
   scatterPlotFrame,
   type MarimekkoSegmentLayout,
   type PieSliceLayout,
@@ -1011,7 +1012,7 @@ function SankeyChart({
   onAddElement: (id: string) => void;
   onDeleteElement: (id: string) => void;
 }) {
-  const ox = 90, oy = 70, w = 780, h = 390;
+  const { x: ox, y: oy, width: w, height: h } = sankeyPlotFrame;
   const data = project.data as SankeyData;
   const layout = layoutSankey(data, project.theme.palette, project.visualOverrides, w, h, project.settings.sankey);
   const selectedNode = selectedId ? layout.nodes.find((n) => n.id === selectedId) : null;

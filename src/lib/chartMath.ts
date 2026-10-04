@@ -346,12 +346,15 @@ type SNode = {
   labelVisible: boolean;
 };
 
+/** Plot area inside the 960×540 slide, shared by the renderer and annotations. */
+export const sankeyPlotFrame = { x: 90, y: 104, width: 780, height: 370 };
+
 export function layoutSankey(
   data: SankeyData,
   palette: string[],
   overrides: Record<string, VisualOverride> = {},
-  width = 780,
-  height = 390,
+  width = sankeyPlotFrame.width,
+  height = sankeyPlotFrame.height,
   settings: SankeySettings = defaultSankeySettings()
 ): SankeyLayout {
   const { nodes, links } = data;
